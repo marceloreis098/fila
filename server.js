@@ -350,12 +350,10 @@ app.disable('x-powered-by');
 app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 
 function clientIp(req) {
+  // Só confia em headers de proxy quando TRUST_PROXY=true (proxy reverso nosso
+  // que sobrescreve/esvazia X-Forwarded-For de cliente). Sem proxy, o socket é a
+  // única fonte confiável — XFF é 100% controlado pelo atacante (spoof de IP).
   if (process.env.TRUST_PROXY === 'true') return req.ip || req.socket.remoteAddress || 'unknown';
-  const forwarded = req.headers['x-real-ip'] || req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    // usa apenas quando confiável — em dev o tráfego é direto (socket)
-    return forwarded.trim().split(',')[0].trim();
-  }
   return req.socket.remoteAddress || 'unknown';
 }
 
@@ -423,6 +421,9 @@ app.use((req, res, next) => {
 
 // Parser JSON rígido: só objetos/arrays no topo, profundidade limitada, 32kb.
 app.use(express.json({ limit: '32kb', strict: true, depth: 8 }));
+
+// Rate limit GLOBAL por IP real em todas as APIs (anti-flood/DoS na camada final)
+app.use('/api', globalLimitMiddleware);
 
 // Sanitização de logs (evita injeção de logs/controle de terminal)
 const sanitizeLog = (v) => String(v ?? '').replace(/[\r\n\u0000-\u001f]/g, ' ').slice(0, 2000);
@@ -888,23 +889,38 @@ if (existsSync(distDir)) {
   );
 }
 
-app.use((_req, res) => {
-  if (existsSync(distDir)) return res.sendFile(resolve(distDir, 'index.html'));
-  return res.status(404).json({ error: 'Frontend não compilado. Rode: npm run build' });
+app.use((req, res) => {
+  if (!existsSync(distDir)) return res.status(404).json({ error: 'Frontend não compilado. Rode: npm run build' });
+  // Fallback SPA apenas para rotas de navegação (sem extensão de arquivo).
+  // Arquivos inexistentes (/.env, /server.js, /data/*.db) e segmentos-dot
+  // (/.git/HEAD, /.env.local) retornam 404 real — sem "soft-404".
+  const isFileLike = /\.[a-zA-Z0-9]{1,10}$/.test(req.path);
+  const hasDotSegment = req.path.split('/').some((seg) => seg.startsWith('.'));
+  if (isFileLike || hasDotSegment) {
+    return res.status(404).type('text').send('Not Found');
+  }
+  return res.sendFile(resolve(distDir, 'index.html'));
 });
 
 // ---------------------------------------------------------------------------
 // Middleware de erro (JSON genérico, sem vazamento em produção)
 // ---------------------------------------------------------------------------
 app.use((err, _req, res, _next) => {
+  const status = err?.status || err?.statusCode;
+  // Erros conhecidos do parser/body
   if (err?.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Corpo da requisição inválido (JSON mal formado).' });
   }
   if (err?.type === 'entity.too.large') {
     return res.status(413).json({ error: 'Requisição muito grande.' });
   }
+  // Outros erros 4xx do body-parser (ex.: charset não suportado -> 415) seguem
+  // com o status correto e mensagem genérica (sem ecoar detalhes internos).
+  if (status && status >= 400 && status < 500) {
+    return res.status(status).json({ error: 'Requisição inválida.' });
+  }
   console.error('[RelicVault] Erro não tratado:', err);
-  res.status(500).json({ error: IS_PROD ? 'Erro interno do servidor.' : String(err?.message || 'Erro interno do servidor.') });
+  res.status(500).json({ error: 'Erro interno do servidor.' });
 });
 
 // ---------------------------------------------------------------------------

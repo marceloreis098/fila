@@ -215,7 +215,16 @@ export default function App() {
       }
 
       if (serverSettings && typeof serverSettings === 'object') {
-        setSettings((prev) => ({ ...DEFAULT_SITE_SETTINGS, ...serverSettings }));
+        setSettings((prev) => ({
+          ...DEFAULT_SITE_SETTINGS,
+          ...serverSettings,
+          // merge profundo: dados da empresa (CNPJ/razão social/endereço) nunca
+          // se perdem quando o servidor/envio local tem settings antigas/parciais.
+          contacts: {
+            ...DEFAULT_SITE_SETTINGS.contacts,
+            ...(serverSettings?.contacts || {}),
+          },
+        }));
       }
     })();
     return () => {

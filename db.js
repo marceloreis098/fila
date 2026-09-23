@@ -10,6 +10,7 @@ import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, chmodSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, 'data');
@@ -140,7 +141,7 @@ const sanitizeImageUrl = (value) => {
 };
 
 const fromProduct = (p) => ({
-  id: String(p.id),
+  id: p?.id ? String(p.id) : randomUUID(),
   name: String(p.name || '').slice(0, 300),
   category: String(p.category || 'tcg'),
   rarity: String(p.rarity || 'raro'),
