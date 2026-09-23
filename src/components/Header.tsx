@@ -1,6 +1,7 @@
 import React from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { ShoppingBag, Bell, Shield, Search } from 'lucide-react';
+import { StoreSiteSettings } from '../types';
+import { ShoppingBag, Bell, Shield, Search, Phone, MessageCircle } from 'lucide-react';
 
 interface HeaderProps {
   currentView: 'store' | 'admin' | 'tracking';
@@ -10,6 +11,7 @@ interface HeaderProps {
   onOpenCart: () => void;
   onOpenNotifications: () => void;
   onSearchFocus: () => void;
+  settings: StoreSiteSettings;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,9 +22,49 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCart,
   onOpenNotifications,
   onSearchFocus,
+  settings,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80">
+      {/* Top Contact & Announcement Strip */}
+      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-3">
+            <span className="text-amber-400 font-semibold hidden md:inline">
+              {settings.topBar.badgeText || 'Cofre Oficial'}
+            </span>
+            <span className="hidden md:inline text-slate-600">·</span>
+            <span className="text-slate-300 font-medium truncate max-w-sm sm:max-w-none">
+              {settings.topBar.announcementText}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 text-[11px]">
+            <a
+              href={`tel:${settings.contacts.phoneRaw || '21900000000'}`}
+              className="flex items-center gap-1.5 text-slate-300 hover:text-white transition font-mono-nums"
+              title="Ligar para o SAC"
+            >
+              <Phone className="w-3 h-3 text-amber-400" />
+              <span>{settings.contacts.phone}</span>
+            </a>
+
+            <a
+              href={`https://wa.me/${settings.contacts.whatsappNumber || '5521900000000'}?text=${encodeURIComponent(
+                `Olá! Gostaria de informações sobre os itens da loja ${settings.storeName}.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-semibold transition"
+              title="Atendimento no WhatsApp"
+            >
+              <MessageCircle className="w-3 h-3" />
+              <span>WhatsApp: {settings.contacts.whatsapp}</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* Strict One-Row Three-Zone Top Bar Contract */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Zone 1: Single text element wordmark */}
@@ -32,9 +74,9 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <span className="text-xl font-bold tracking-tight text-slate-900 font-display flex items-center gap-1.5">
             <span className="w-6 h-6 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center text-xs font-bold font-serif shadow-xs">
-              R
+              {settings.storeName.charAt(0) || 'R'}
             </span>
-            <span className="text-slate-900">Relic<span className="text-amber-600">Vault</span></span>
+            <span className="text-slate-900">{settings.storeName}</span>
           </span>
         </button>
 

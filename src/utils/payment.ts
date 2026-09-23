@@ -59,10 +59,15 @@ export interface InstallmentOption {
   interestRate: number;
 }
 
-export function calculateInstallments(total: number): InstallmentOption[] {
+export function calculateInstallments(
+  total: number,
+  maxInstallments: number = 12,
+  interestFreeInstallments: number = 6
+): InstallmentOption[] {
   const options: InstallmentOption[] = [];
-  for (let i = 1; i <= 12; i++) {
-    if (i <= 6) {
+  const max = Math.max(1, Math.min(24, maxInstallments));
+  for (let i = 1; i <= max; i++) {
+    if (i <= interestFreeInstallments) {
       options.push({
         installments: i,
         amount: total / i,
@@ -71,7 +76,7 @@ export function calculateInstallments(total: number): InstallmentOption[] {
         interestRate: 0,
       });
     } else {
-      // 1.99% a.m. a partir da 7ª parcela
+      // 1.99% a.m. a partir das parcelas com juros
       const rate = 0.0199;
       const compoundFactor = Math.pow(1 + rate, i);
       const installmentAmount = (total * rate * compoundFactor) / (compoundFactor - 1);

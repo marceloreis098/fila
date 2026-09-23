@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { CollectibleItem, Order, OrderStatus, ItemCategory, ItemRarity, ItemCondition } from '../types';
+import { CollectibleItem, Order, OrderStatus, ItemCategory, ItemRarity, ItemCondition, StoreSiteSettings } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
 import { ImagePicker } from './ImagePicker';
+import { SiteContentEditor } from './SiteContentEditor';
+import { PaymentGatewaysEditor } from './PaymentGatewaysEditor';
 import { 
   Plus, 
   Minus,
@@ -23,29 +25,37 @@ import {
   Sparkles,
   Award,
   Layers,
-  FileText
+  FileText,
+  Zap,
+  Globe
 } from 'lucide-react';
 
 interface AdminPanelProps {
   products: CollectibleItem[];
   orders: Order[];
+  settings: StoreSiteSettings;
   onAddProduct: (item: CollectibleItem) => void;
   onUpdateProduct: (item: CollectibleItem) => void;
   onDeleteProduct: (id: string) => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, trackingCode?: string) => void;
   onResetCatalog: () => void;
+  onSaveSettings: (newSettings: StoreSiteSettings) => void;
+  onResetSettings: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   orders,
+  settings,
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
   onUpdateOrderStatus,
   onResetCatalog,
+  onSaveSettings,
+  onResetSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'metrics'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'site_editor' | 'payment_methods' | 'metrics'>('inventory');
   
   // New product form modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -53,7 +63,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     name: '',
     category: 'tcg',
     rarity: 'raro',
-    condition: 'PSA 10 Gem Mint',
+    condition: 'Estado Impecável (Imaculado)',
     year: 2024,
     price: 1500,
     stock: 2,
@@ -93,7 +103,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       name: newProduct.name || 'Item Colecionável',
       category: (newProduct.category as ItemCategory) || 'tcg',
       rarity: (newProduct.rarity as ItemRarity) || 'raro',
-      condition: (newProduct.condition as ItemCondition) || 'PSA 10 Gem Mint',
+      condition: (newProduct.condition as ItemCondition) || 'Estado Impecável (Imaculado)',
       year: Number(newProduct.year) || 2024,
       price: Number(newProduct.price) || 500,
       stock: Number(newProduct.stock) || 1,
@@ -167,22 +177,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-xl self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-200/80 rounded-xl self-start sm:self-auto">
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'inventory' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Estoque & Catálogo ({products.length})
+            <Package className="w-3.5 h-3.5" />
+            <span>Estoque ({products.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('orders')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'orders' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Vendas & Pedidos ({orders.length})
+            <Truck className="w-3.5 h-3.5" />
+            <span>Vendas & Pedidos ({orders.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('site_editor')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'site_editor' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-600" />
+            <span>Editor do Site & Textos</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('payment_methods')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'payment_methods' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Métodos de Pagamento</span>
           </button>
           <button
             onClick={() => setActiveTab('metrics')}
@@ -530,6 +560,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
+      {/* TAB 4: SITE CONTENT & TEXTS & CONTACTS EDITOR */}
+      {activeTab === 'site_editor' && (
+        <SiteContentEditor
+          settings={settings}
+          onSaveSettings={onSaveSettings}
+          onResetSettings={onResetSettings}
+        />
+      )}
+
+      {/* TAB 5: NATIONAL PAYMENT METHODS (PIX, CARTAO, BOLETO, DIGITAL WALLETS) */}
+      {activeTab === 'payment_methods' && (
+        <PaymentGatewaysEditor
+          payments={settings.payments}
+          onSavePayments={(newPayments) => {
+            onSaveSettings({
+              ...settings,
+              payments: newPayments,
+            });
+          }}
+          onResetPayments={onResetSettings}
+        />
+      )}
+
       {/* MODAL 1: ADD NEW PRODUCT (WITH ADVANCED IMAGE PICKER & FULL SPECS) */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
@@ -537,7 +590,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="p-4 md:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm md:text-base">Adicionar Novo Colecionável</h3>
-                <p className="text-[11px] text-slate-500">Cadastre a peça com fotos em alta resolução e laudo pericial</p>
+                <p className="text-[11px] text-slate-500">Cadastre a peça com fotos em alta resolução e certificado de autenticidade</p>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -658,12 +711,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {/* Condition & Certificate */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Condição / Graduação Pericial</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Condição / Estado de Conservação</label>
                   <input
                     type="text"
                     value={newProduct.condition}
                     onChange={(e) => setNewProduct({ ...newProduct, condition: e.target.value as ItemCondition })}
-                    placeholder="Ex: PSA 10 Gem Mint / BGS 9.5"
+                    placeholder="Ex: Estado Impecável / Caixa Selada / Pristine"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
                   />
                 </div>
@@ -742,7 +795,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <span>Editar Colecionável: {editingProduct.name}</span>
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Modifique a foto, descrição, preço, estoque e informações periciais
+                  Modifique a foto, descrição, preço, estoque e informações do certificado
                 </p>
               </div>
               <button
@@ -862,12 +915,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {/* Condition & Certificate */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Condição / Graduação</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Condição / Estado de Conservação</label>
                   <input
                     type="text"
                     value={editingProduct.condition}
                     onChange={(e) => setEditingProduct({ ...editingProduct, condition: e.target.value as ItemCondition })}
-                    placeholder="Ex: PSA 10 Gem Mint / Caixa Selada"
+                    placeholder="Ex: Estado Impecável / Caixa Selada / Pristine"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
                   />
                 </div>

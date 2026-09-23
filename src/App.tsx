@@ -10,9 +10,11 @@ import {
   Order, 
   OrderStatus, 
   AppNotification, 
-  FilterState 
+  FilterState,
+  StoreSiteSettings
 } from './types';
 import { INITIAL_PRODUCTS } from './data/initialProducts';
+import { DEFAULT_SITE_SETTINGS } from './data/defaultSettings';
 import { Header } from './components/Header';
 import { BottomTabBar } from './components/BottomTabBar';
 import { Hero } from './components/Hero';
@@ -24,6 +26,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { OrderTrackingModal } from './components/OrderTrackingModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminSecurityGuard } from './components/AdminSecurityGuard';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { 
@@ -33,14 +36,43 @@ import {
   Bell, 
   CheckCircle2, 
   Smartphone,
-  Info
+  Info,
+  Phone,
+  MessageCircle
 } from 'lucide-react';
 
 const STORAGE_KEYS = {
-  PRODUCTS: 'relicvault_products_v1',
+  PRODUCTS: 'relicvault_products_v2',
   CART: 'relicvault_cart_v1',
   ORDERS: 'relicvault_orders_v1',
   NOTIFICATIONS: 'relicvault_notifications_v1',
+  SETTINGS: 'relicvault_settings_v1',
+};
+
+const sanitizeCollectibleItem = (item: CollectibleItem): CollectibleItem => {
+  const clean = (str: string = '') =>
+    str
+      .replace(/PSA\s*10\s*Gem\s*Mint/gi, 'Estado Impecável (Imaculado)')
+      .replace(/PSA\s*Gem\s*Mint\s*10/gi, 'Estado Impecável')
+      .replace(/BGS\s*9\.5\s*Mint/gi, 'Caixa Selada / Impecável')
+      .replace(/PSA/gi, 'RelicVault')
+      .replace(/BGS/gi, 'RelicVault')
+      .replace(/CGC/gi, 'RelicVault')
+      .replace(/laudo\s*pericial/gi, 'certificado de autenticidade')
+      .replace(/laudo/gi, 'certificado')
+      .replace(/perícia\s*independente/gi, 'avaliação criteriosa')
+      .replace(/perícia/gi, 'avaliação');
+
+  return {
+    ...item,
+    condition: clean(item.condition),
+    description: clean(item.description),
+    authenticityCert: clean(item.authenticityCert),
+    specs: (item.specs || []).map((s) => ({
+      label: clean(s.label),
+      value: clean(s.value),
+    })),
+  };
 };
 
 export default function App() {
@@ -51,7 +83,10 @@ export default function App() {
   const [products, setProducts] = useState<CollectibleItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: CollectibleItem[] = JSON.parse(saved);
+        return parsed.map(sanitizeCollectibleItem);
+      }
     } catch {
       // fallback
     }
@@ -98,6 +133,19 @@ export default function App() {
         read: false,
       },
     ];
+  });
+
+  // Site settings state (persisted)
+  const [settings, setSettings] = useState<StoreSiteSettings>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_SITE_SETTINGS;
   });
 
   // Active Floating Toast
@@ -178,6 +226,34 @@ export default function App() {
     setNotifications((prev) => [newNotif, ...prev]);
     setActiveToast({ title, message });
     setTimeout(() => setActiveToast(null), 4000);
+  };
+
+  const handleSaveSettings = (newSettings: StoreSiteSettings) => {
+    setSettings(newSettings);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(newSettings));
+    } catch (e) {
+      console.error(e);
+    }
+    pushNotification(
+      'Configurações Salvas',
+      'As alterações do site e métodos de pagamento foram aplicadas com sucesso.',
+      'system'
+    );
+  };
+
+  const handleResetSettings = () => {
+    setSettings(DEFAULT_SITE_SETTINGS);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_SITE_SETTINGS));
+    } catch (e) {
+      console.error(e);
+    }
+    pushNotification(
+      'Padrão Restaurado',
+      'Textos, contatos e configurações de pagamento foram redefinidos para os valores originais.',
+      'system'
+    );
   };
 
   // Cart operations
@@ -461,6 +537,7 @@ export default function App() {
         onOpenCart={() => setIsCartOpen(true)}
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
         onSearchFocus={scrollToCatalog}
+        settings={settings}
       />
 
       {/* MAIN VIEWPORT CONTENT */}
@@ -468,7 +545,7 @@ export default function App() {
         {currentView === 'store' && (
           <div>
             {/* Hero Showcase */}
-            <Hero onExplore={scrollToCatalog} />
+            <Hero onExplore={scrollToCatalog} settings={settings} />
 
             {/* Catalog Section */}
             <div ref={catalogRef} className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-12 space-y-6">
@@ -571,43 +648,131 @@ export default function App() {
               orders={orders}
               selectedOrderId={selectedTrackingOrderId}
               onSelectOrder={(id) => setSelectedTrackingOrderId(id)}
+              settings={settings}
             />
           </div>
         )}
 
-        {/* Admin Dashboard View */}
+        {/* Admin Dashboard View with Strong Password & MFA Gateway */}
         {currentView === 'admin' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-12">
-            <AdminPanel
-              products={products}
-              orders={orders}
-              onAddProduct={handleAddProduct}
-              onUpdateProduct={handleUpdateProduct}
-              onDeleteProduct={handleDeleteProduct}
-              onUpdateOrderStatus={handleUpdateOrderStatus}
-              onResetCatalog={handleResetCatalog}
-            />
+            <AdminSecurityGuard>
+              <AdminPanel
+                products={products}
+                orders={orders}
+                onAddProduct={handleAddProduct}
+                onUpdateProduct={handleUpdateProduct}
+                onDeleteProduct={handleDeleteProduct}
+                onUpdateOrderStatus={handleUpdateOrderStatus}
+                onResetCatalog={handleResetCatalog}
+                settings={settings}
+                onSaveSettings={handleSaveSettings}
+                onResetSettings={handleResetSettings}
+              />
+            </AdminSecurityGuard>
           </div>
         )}
       </main>
 
       {/* Footer */}
       <footer className="mt-12 bg-white border-t border-slate-200/80 text-slate-500 text-xs py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-900 font-display">RelicVault</span>
-            <span>—</span>
-            <span>Loja Virtual de Colecionáveis Raros & Moedas</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base text-slate-900 font-display">{settings.storeName}</span>
+                <span>—</span>
+                <span className="font-medium text-slate-700">{settings.storeTagline}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 max-w-md leading-relaxed">
+                Autenticidade garantida com certificado exclusivo, envio blindado com seguro total Sedex para todo o território nacional.
+              </p>
+              <div className="text-[10px] text-slate-400 mt-2 space-y-0.5">
+                <div>CNPJ: <span className="font-mono-nums">{settings.contacts.cnpj}</span> · {settings.contacts.companyName}</div>
+                <div>{settings.contacts.address}</div>
+              </div>
+            </div>
+
+            {/* Direct Contact & Support Box */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div>
+                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Central de Atendimento & SAC
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <a
+                    href={`tel:${settings.contacts.phoneRaw || '21900000000'}`}
+                    className="text-sm font-bold text-slate-900 hover:text-amber-700 transition font-mono-nums flex items-center gap-1.5"
+                    title="Ligar para o SAC"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{settings.contacts.phone}</span>
+                  </a>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {settings.contacts.supportHours}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  {settings.contacts.email}
+                </div>
+              </div>
+
+              <a
+                href={`https://wa.me/${settings.contacts.whatsappNumber || '5521900000000'}?text=${encodeURIComponent(
+                  `Olá! Gostaria de falar com o atendimento da ${settings.storeName}.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Chamar no WhatsApp</span>
+              </a>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>PIX Instantâneo</span>
-            <span>·</span>
-            <span>Cartão em até 12x</span>
-            <span>·</span>
-            <span>Boleto Bancário</span>
-            <span>·</span>
-            <span>Sedex com Seguro Total</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px]">
+            <div>
+              © 2026 {settings.storeName}. Todos os direitos reservados. SAC: {settings.contacts.phone}.
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-slate-500">
+              {settings.payments.pix.enabled && (
+                <span>PIX Instantâneo ({settings.payments.pix.discountPercent}% OFF)</span>
+              )}
+              {settings.payments.creditCard.enabled && (
+                <>
+                  <span>·</span>
+                  <span>Cartão em até {settings.payments.creditCard.maxInstallments}x</span>
+                </>
+              )}
+              {settings.payments.boleto.enabled && (
+                <>
+                  <span>·</span>
+                  <span>Boleto Bancário</span>
+                </>
+              )}
+              {settings.payments.digitalWallets.picpay && (
+                <>
+                  <span>·</span>
+                  <span className="text-emerald-700 font-semibold">PicPay</span>
+                </>
+              )}
+              {settings.payments.digitalWallets.mercadopago && (
+                <>
+                  <span>·</span>
+                  <span className="text-blue-700 font-semibold">Mercado Pago</span>
+                </>
+              )}
+              {settings.payments.digitalWallets.nupay && (
+                <>
+                  <span>·</span>
+                  <span className="text-purple-700 font-semibold">NuPay</span>
+                </>
+              )}
+              <span>·</span>
+              <span>Sedex com Seguro Total</span>
+            </div>
           </div>
         </div>
       </footer>
@@ -649,6 +814,7 @@ export default function App() {
         onClose={() => setIsCheckoutOpen(false)}
         cart={cart}
         onOrderCreated={handleOrderCreated}
+        settings={settings}
       />
 
       {/* Notifications Drawer */}

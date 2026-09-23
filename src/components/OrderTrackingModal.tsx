@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, StoreSiteSettings } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
 import { 
   X, 
@@ -20,6 +20,7 @@ interface OrderTrackingModalProps {
   orders: Order[];
   selectedOrderId?: string | null;
   onSelectOrder?: (orderId: string) => void;
+  settings?: StoreSiteSettings;
 }
 
 const STATUS_STEPS: { key: OrderStatus; label: string; description: string }[] = [
@@ -36,6 +37,7 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
   orders,
   selectedOrderId,
   onSelectOrder,
+  settings,
 }) => {
   if (!isOpen) return null;
 
@@ -224,20 +226,25 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
               </div>
 
               {/* WhatsApp Notification trigger */}
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-900">
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>Dúvidas ou atualizações sobre este envio? Fale com nosso suporte.</span>
+                  <div>
+                    <div className="font-semibold">Dúvidas sobre este envio? Fale com nosso suporte oficial:</div>
+                    <div className="text-[11px] text-emerald-700 font-mono-nums">
+                      WhatsApp: {settings?.contacts?.whatsapp || '(21) 90000-0000'}
+                    </div>
+                  </div>
                 </div>
                 <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                  href={`https://api.whatsapp.com/send?phone=${settings?.contacts?.whatsappNumber || '5521900000000'}&text=${encodeURIComponent(
                     `Olá! Gostaria de informações sobre o pedido #${currentOrder.id} (${currentOrder.trackingCode}).`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-1 shrink-0"
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-1 shrink-0 transition"
                 >
-                  <span>WhatsApp</span>
+                  <span>WhatsApp {settings?.contacts?.whatsapp || '(21) 90000-0000'}</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>

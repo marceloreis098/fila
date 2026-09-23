@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, Order, OrderCustomer } from '../types';
+import { CartItem, Order, OrderCustomer, StoreSiteSettings } from '../types';
 import { 
   formatCurrencyBRL, 
   formatCPF, 
@@ -28,7 +28,8 @@ import {
   Clock, 
   ExternalLink,
   MessageCircle,
-  Truck
+  Truck,
+  Smartphone
 } from 'lucide-react';
 
 interface CheckoutModalProps {
@@ -36,6 +37,7 @@ interface CheckoutModalProps {
   onClose: () => void;
   cart: CartItem[];
   onOrderCreated: (order: Order) => void;
+  settings: StoreSiteSettings;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -43,6 +45,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   cart,
   onOrderCreated,
+  settings,
 }) => {
   const [step, setStep] = useState<'details' | 'payment' | 'success'>('details');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'boleto'>('pix');
@@ -51,16 +54,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customer, setCustomer] = useState<OrderCustomer>({
     name: 'Roberto Vianna da Silva',
     email: 'roberto.vianna@gmail.com',
-    phone: '(11) 98765-4321',
+    phone: '(21) 98765-4321',
     cpf: '123.456.789-00',
     address: {
-      cep: '01310-100',
-      street: 'Avenida Paulista',
-      number: '1578',
+      cep: '22041-001',
+      street: 'Avenida Atlântica',
+      number: '1420',
       complement: 'Apt 142',
-      neighborhood: 'Bela Vista',
-      city: 'São Paulo',
-      state: 'SP',
+      neighborhood: 'Copacabana',
+      city: 'Rio de Janeiro',
+      state: 'RJ',
     },
   });
 
@@ -82,10 +85,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const subtotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
   const shipping = subtotal >= 500 ? 0 : 45;
-  const discount = paymentMethod === 'pix' ? subtotal * 0.05 : 0;
+  const pixDiscountPercent = settings.payments.pix.enabled ? settings.payments.pix.discountPercent : 0;
+  const discount = paymentMethod === 'pix' ? subtotal * (pixDiscountPercent / 100) : 0;
   const total = subtotal + shipping - discount;
 
-  const installmentOptions = calculateInstallments(subtotal + shipping);
+  const maxInst = settings.payments.creditCard.maxInstallments || 12;
+  const freeInst = settings.payments.creditCard.interestFreeInstallments || 3;
+  const installmentOptions = calculateInstallments(subtotal + shipping, maxInst, freeInst);
   const detectedBrand = detectCardBrand(cardNumber);
 
   // Pix countdown
@@ -371,7 +377,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                 >
                   <Zap className="w-4 h-4 text-emerald-600" />
-                  <span>PIX (5% OFF)</span>
+                  <span>PIX {pixDiscountPercent > 0 ? `(${pixDiscountPercent}% OFF)` : ''}</span>
                 </button>
 
                 <button
@@ -383,7 +389,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                 >
                   <CreditCard className="w-4 h-4 text-amber-600" />
-                  <span>Cartão de Crédito</span>
+                  <span>Cartão (Até {maxInst}x)</span>
                 </button>
 
                 <button
@@ -399,12 +405,44 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
               </div>
 
+              {/* Digital Wallets Badges Strip */}
+              {(settings.payments.digitalWallets.picpay || 
+                settings.payments.digitalWallets.mercadopago || 
+                settings.payments.digitalWallets.nupay || 
+                settings.payments.digitalWallets.googlePay) && (
+                <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[10px] text-slate-500">
+                  <span className="font-semibold text-slate-600 flex items-center gap-1">
+                    <Smartphone className="w-3 h-3 text-purple-600" />
+                    <span>Carteiras Digitais Nacionais Habilitadas:</span>
+                  </span>
+                  <div className="flex items-center gap-2 font-medium">
+                    {settings.payments.digitalWallets.picpay && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">PicPay</span>
+                    )}
+                    {settings.payments.digitalWallets.mercadopago && (
+                      <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">Mercado Pago</span>
+                    )}
+                    {settings.payments.digitalWallets.nupay && (
+                      <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-bold border border-purple-200">NuPay</span>
+                    )}
+                    {settings.payments.digitalWallets.googlePay && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-300">Google Pay</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* METHOD 1: PIX */}
               {paymentMethod === 'pix' && (
                 <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-4">
-                  <div className="flex items-center justify-center gap-2 text-emerald-800 font-semibold text-xs">
-                    <Clock className="w-4 h-4 animate-pulse" />
-                    <span>Tempo para pagamento: <strong className="font-mono-nums">{formatTimer(pixTimeRemaining)}</strong></span>
+                  <div className="flex items-center justify-between text-xs text-slate-600 px-1">
+                    <span className="flex items-center gap-1.5 text-emerald-800 font-semibold">
+                      <Clock className="w-4 h-4 animate-pulse" />
+                      <span>Expira em: <strong className="font-mono-nums">{formatTimer(pixTimeRemaining)}</strong></span>
+                    </span>
+                    <span className="text-[11px] text-slate-500 truncate max-w-xs">
+                      Favorecido: <strong className="text-slate-800">{settings.payments.pix.recipientName}</strong>
+                    </span>
                   </div>
 
                   {/* QR Code */}
@@ -664,20 +702,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               {/* WhatsApp Notification trigger */}
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span className="text-left">Deseja receber atualizações deste pedido direto no seu WhatsApp?</span>
+                  <div>
+                    <span className="font-semibold text-slate-800">Receber atualizações deste pedido no WhatsApp?</span>
+                    <div className="text-[11px] text-emerald-700 font-mono-nums">SAC RelicVault: (21) 90000-0000</div>
+                  </div>
                 </div>
                 <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                  href={`https://api.whatsapp.com/send?phone=5521900000000&text=${encodeURIComponent(
                     `Olá! Meu pedido no RelicVault é #${createdOrder.id}. Gostaria de acompanhar o status de envio do rastreio ${createdOrder.trackingCode}.`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold whitespace-nowrap flex items-center gap-1 shrink-0"
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold whitespace-nowrap flex items-center justify-center gap-1 shrink-0 transition"
                 >
-                  <span>Ativar</span>
+                  <span>Ativar WhatsApp</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
