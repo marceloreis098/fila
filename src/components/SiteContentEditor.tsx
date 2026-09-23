@@ -593,7 +593,7 @@ export const SiteContentEditor: React.FC<SiteContentEditorProps> = ({
                     topBar: { ...formData.topBar, announcementText: e.target.value }
                   })}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-medium"
-                  placeholder="Ex: 🛡️ Envio Blindado Sedex com Seguro Total | PIX com 5% de Desconto"
+                  placeholder="Ex: 🛡️ Envio Blindado Sedex com Seguro Total para todo o Brasil"
                 />
               </div>
 

@@ -81,7 +81,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <Bell className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm font-medium">Nenhuma notificação por enquanto</p>
               <p className="text-xs text-slate-400 mt-1">
-                Atualizações de pedidos e pagamentos aparecerão aqui em tempo real.
+                Atualizações de pedidos e avisos da loja aparecerão aqui.
               </p>
             </div>
           ) : (

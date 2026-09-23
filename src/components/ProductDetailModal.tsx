@@ -1,32 +1,18 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CollectibleItem } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
-import { X, ShieldCheck, ShoppingBag, Truck, Lock, Award, Zap, Check } from 'lucide-react';
+import { X, ShieldCheck, Truck, Award, Lock } from 'lucide-react';
 
 interface ProductDetailModalProps {
   item: CollectibleItem | null;
   onClose: () => void;
-  onAddToCart: (item: CollectibleItem) => void;
-  onBuyNow: (item: CollectibleItem) => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   item,
   onClose,
-  onAddToCart,
-  onBuyNow,
 }) => {
-  const [addedAnimation, setAddedAnimation] = useState(false);
-
   if (!item) return null;
-
-  const pixPrice = item.price * 0.95; // 5% de desconto no Pix à vista
-
-  const handleAdd = () => {
-    onAddToCart(item);
-    setAddedAnimation(true);
-    setTimeout(() => setAddedAnimation(false), 1500);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
@@ -80,8 +66,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {item.name}
           </h2>
 
-          {/* Price Block with Brazilian Payment Options */}
-          <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+          {/* Price Block — vitrine (compra indisponível até gateway real) */}
+          <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
             <div className="flex items-baseline gap-2">
               <span className="text-2xl md:text-3xl font-bold text-slate-900 font-mono-nums">
                 {formatCurrencyBRL(item.price)}
@@ -92,17 +78,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </span>
               )}
             </div>
-
-            {/* Pix discount highlight */}
-            <div className="flex items-center gap-2 text-xs text-emerald-800 font-medium">
-              <Zap className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>
-                <strong>{formatCurrencyBRL(pixPrice)}</strong> à vista no <strong>PIX</strong> (5% de desconto)
-              </span>
-            </div>
-
-            <div className="text-xs text-slate-600">
-              Ou em até <strong className="text-slate-800">12x no cartão de crédito</strong> (sem juros até 6x de {formatCurrencyBRL(item.price / 6)})
+            <div className="text-xs text-slate-500 mt-1">
+              Valor de referência da curadoria · disponibilidade sob consulta
             </div>
           </div>
 
@@ -135,45 +112,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="mt-5 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-600">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-slate-400 shrink-0" />
-              <span>Envio blindado via <strong>Sedex com seguro total</strong> para todo o Brasil.</span>
+              <span>Logística via <strong>Sedex com seguro total</strong> para todo o Brasil.</span>
             </div>
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-slate-400 shrink-0" />
-              <span>Transação protegida com certificação SSL e antifraude bancário.</span>
+              <span>Peça em curadoria — disponibilidade sob consulta pelo atendimento da loja.</span>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
-            <button
-              onClick={handleAdd}
-              disabled={item.stock === 0}
-              className={`flex-1 min-h-[48px] px-4 rounded-xl border border-slate-300 font-semibold text-xs md:text-sm flex items-center justify-center gap-2 transition active:scale-95 ${
-                addedAnimation 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
-                  : 'hover:bg-slate-100 text-slate-800'
-              }`}
-            >
-              {addedAnimation ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Adicionado!</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingBag className="w-4 h-4" />
-                  <span>Adicionar ao Carrinho</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => onBuyNow(item)}
-              disabled={item.stock === 0}
-              className="flex-1 min-h-[48px] px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs md:text-sm shadow-md active:scale-95 transition flex items-center justify-center gap-2"
-            >
-              Comprar Imediatamente
-            </button>
+          {/* Purchase disabled notice */}
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-center">
+              A compra online está temporariamente desativada.
+              <span className="block text-[11px] text-amber-800 mt-0.5">
+                Consulte a disponibilidade pelo WhatsApp ou telefone da loja.
+              </span>
+            </div>
           </div>
         </div>
       </div>

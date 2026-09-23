@@ -1,14 +1,12 @@
 import React from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { StoreSiteSettings } from '../types';
-import { ShoppingBag, Bell, Shield, Search, Phone, MessageCircle } from 'lucide-react';
+import { Bell, Shield, Search, Phone, MessageCircle } from 'lucide-react';
 
 interface HeaderProps {
   currentView: 'store' | 'admin' | 'tracking';
   onNavigate: (view: 'store' | 'admin' | 'tracking') => void;
-  cartCount: number;
   unreadNotificationsCount: number;
-  onOpenCart: () => void;
   onOpenNotifications: () => void;
   onSearchFocus: () => void;
   settings: StoreSiteSettings;
@@ -17,9 +15,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentView,
   onNavigate,
-  cartCount,
   unreadNotificationsCount,
-  onOpenCart,
   onOpenNotifications,
   onSearchFocus,
   settings,
@@ -132,22 +128,6 @@ export const Header: React.FC<HeaderProps> = ({
             {unreadNotificationsCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold font-mono-nums flex items-center justify-center animate-pulse">
                 {unreadNotificationsCount}
-              </span>
-            )}
-          </button>
-
-          {/* Cart Button */}
-          <button
-            onClick={onOpenCart}
-            className="relative flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition active:scale-95"
-            title="Abrir carrinho"
-            aria-label="Carrinho de compras"
-          >
-            <ShoppingBag className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline font-mono-nums">{cartCount}</span>
-            {cartCount > 0 && (
-              <span className="sm:hidden w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold font-mono-nums flex items-center justify-center">
-                {cartCount}
               </span>
             )}
           </button>

@@ -1,26 +1,22 @@
 import React from 'react';
-import { Home, Search, ShoppingBag, Truck, Shield } from 'lucide-react';
+import { Home, Search, Truck, Shield } from 'lucide-react';
 
 interface BottomTabBarProps {
   currentView: 'store' | 'admin' | 'tracking';
   onNavigate: (view: 'store' | 'admin' | 'tracking') => void;
-  cartCount: number;
   ordersCount: number;
-  onOpenCart: () => void;
   onSearchFocus: () => void;
 }
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   currentView,
   onNavigate,
-  cartCount,
   ordersCount,
-  onOpenCart,
   onSearchFocus,
 }) => {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg pb-safe">
-      <div className="grid grid-cols-5 items-center h-16 max-w-md mx-auto px-2">
+      <div className="grid grid-cols-4 items-center h-16 max-w-md mx-auto px-2">
         {/* Tab 1: Loja */}
         <button
           onClick={() => onNavigate('store')}
@@ -46,24 +42,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           <span className="text-[10px] tracking-tight mt-1">Buscar</span>
         </button>
 
-        {/* Tab 3: Carrinho */}
-        <button
-          onClick={onOpenCart}
-          className="min-h-[44px] min-w-[44px] relative flex flex-col items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-90"
-          aria-label="Carrinho"
-        >
-          <div className="relative">
-            <ShoppingBag className="w-5 h-5" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-2.5 w-4 h-4 rounded-full bg-amber-600 text-white text-[9px] font-bold font-mono-nums flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] tracking-tight mt-1">Carrinho</span>
-        </button>
-
-        {/* Tab 4: Rastrear */}
+        {/* Tab 3: Rastrear */}
         <button
           onClick={() => onNavigate('tracking')}
           className={`min-h-[44px] min-w-[44px] relative flex flex-col items-center justify-center transition active:scale-90 ${
@@ -80,7 +59,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           <span className="text-[10px] tracking-tight mt-1">Rastreio</span>
         </button>
 
-        {/* Tab 5: Admin */}
+        {/* Tab 4: Admin */}
         <button
           onClick={() => onNavigate('admin')}
           className={`min-h-[44px] min-w-[44px] flex flex-col items-center justify-center transition active:scale-90 ${

@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CollectibleItem, 
-  CartItem, 
   Order, 
   OrderStatus, 
   AppNotification, 
@@ -21,8 +20,6 @@ import { Hero } from './components/Hero';
 import { FilterBar } from './components/FilterBar';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailModal } from './components/ProductDetailModal';
-import { CartDrawer } from './components/CartDrawer';
-import { CheckoutModal } from './components/CheckoutModal';
 import { OrderTrackingModal } from './components/OrderTrackingModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { AdminPanel } from './components/AdminPanel';
@@ -30,20 +27,15 @@ import { AdminSecurityGuard } from './components/AdminSecurityGuard';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { 
-  ShieldCheck, 
   Package, 
-  Sparkles, 
   Bell, 
-  CheckCircle2, 
   Smartphone,
-  Info,
   Phone,
   MessageCircle
 } from 'lucide-react';
 
 const STORAGE_KEYS = {
   PRODUCTS: 'relicvault_products_v2',
-  CART: 'relicvault_cart_v1',
   ORDERS: 'relicvault_orders_v1',
   NOTIFICATIONS: 'relicvault_notifications_v1',
   SETTINGS: 'relicvault_settings_v1',
@@ -93,17 +85,6 @@ export default function App() {
     return INITIAL_PRODUCTS;
   });
 
-  // Cart state (persisted)
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CART);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return [];
-  });
-
   // Orders state (persisted)
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
@@ -127,7 +108,7 @@ export default function App() {
       {
         id: 'notif-welcome',
         title: 'Bem-vindo ao RelicVault',
-        message: 'Explore nosso catálogo de itens colecionáveis autênticos com pagamento seguro via PIX e cartão em até 12x.',
+        message: 'Explore nosso catálogo de itens colecionáveis autênticos com curadoria exclusiva e certificação de originalidade.',
         timestamp: new Date().toISOString(),
         type: 'system',
         read: false,
@@ -164,8 +145,6 @@ export default function App() {
 
   // Modals & Drawers
   const [selectedProduct, setSelectedProduct] = useState<CollectibleItem | null>(null);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [selectedTrackingOrderId, setSelectedTrackingOrderId] = useState<string | null>(null);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
@@ -181,14 +160,6 @@ export default function App() {
       console.error(e);
     }
   }, [products]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [cart]);
 
   useEffect(() => {
     try {
@@ -237,7 +208,7 @@ export default function App() {
     }
     pushNotification(
       'Configurações Salvas',
-      'As alterações do site e métodos de pagamento foram aplicadas com sucesso.',
+      'As alterações do site foram aplicadas com sucesso.',
       'system'
     );
   };
@@ -251,90 +222,12 @@ export default function App() {
     }
     pushNotification(
       'Padrão Restaurado',
-      'Textos, contatos e configurações de pagamento foram redefinidos para os valores originais.',
+      'Textos e contatos foram redefinidos para os valores originais.',
       'system'
     );
   };
 
-  // Cart operations
-  const handleAddToCart = (item: CollectibleItem) => {
-    if (item.stock === 0) return;
-
-    setCart((prev) => {
-      const existing = prev.find((c) => c.item.id === item.id);
-      if (existing) {
-        if (existing.quantity >= item.stock) return prev;
-        return prev.map((c) =>
-          c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-        );
-      }
-      return [...prev, { item, quantity: 1 }];
-    });
-  };
-
-  const handleUpdateCartQuantity = (itemId: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((c) => {
-          if (c.item.id === itemId) {
-            const newQty = c.quantity + delta;
-            if (newQty <= 0) return null;
-            if (newQty > c.item.stock) return c;
-            return { ...c, quantity: newQty };
-          }
-          return c;
-        })
-        .filter((c): c is CartItem => c !== null)
-    );
-  };
-
-  const handleRemoveCartItem = (itemId: string) => {
-    setCart((prev) => prev.filter((c) => c.item.id !== itemId));
-  };
-
-  const handleBuyNow = (item: CollectibleItem) => {
-    handleAddToCart(item);
-    setSelectedProduct(null);
-    setIsCheckoutOpen(true);
-  };
-
-  // Order created handler
-  const handleOrderCreated = (newOrder: Order) => {
-    // 1. Deduct stock from products
-    setProducts((prev) =>
-      prev.map((prod) => {
-        const orderItem = newOrder.items.find((it) => it.item.id === prod.id);
-        if (orderItem) {
-          const updatedStock = Math.max(0, prod.stock - orderItem.quantity);
-          return { ...prod, stock: updatedStock };
-        }
-        return prod;
-      })
-    );
-
-    // 2. Add to orders list
-    setOrders((prev) => [newOrder, ...prev]);
-
-    // 3. Clear cart
-    setCart([]);
-
-    // 4. Trigger automated notification
-    if (newOrder.status === 'paid') {
-      pushNotification(
-        'Pagamento Confirmado!',
-        `Seu pagamento de R$ ${newOrder.total.toLocaleString('pt-BR')} para o pedido #${newOrder.id} foi aprovado. A separação no cofre começará imediatamente.`,
-        'payment',
-        newOrder.id
-      );
-    } else {
-      pushNotification(
-        'Pedido Registrado com Sucesso',
-        `Pedido #${newOrder.id} registrado via ${newOrder.paymentMethod.toUpperCase()}. Aguardando confirmação bancária.`,
-        'order',
-        newOrder.id
-      );
-    }
-  };
+  // Order created handler — removed: checkout/compra desativada (vitrine até gateway real)
 
   // Admin order status update with AUTOMATIC notifications
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
@@ -429,13 +322,12 @@ export default function App() {
 
   const handleDeleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
-    setCart((prev) => prev.filter((c) => c.item.id !== id));
   };
 
   const handleResetCatalog = () => {
     setProducts(INITIAL_PRODUCTS);
     localStorage.removeItem(STORAGE_KEYS.PRODUCTS);
-    pushNotification('Catálogo Restaurado', 'O catálogo retornou aos 8 itens padrão de alta fidelidade.', 'system');
+    pushNotification('Catálogo Restaurado', 'O catálogo retornou ao estado inicial (sem itens de demonstração).', 'system');
   };
 
   // Notification actions
@@ -503,7 +395,6 @@ export default function App() {
       });
   }, [products, filters]);
 
-  const totalCartCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
   const unreadNotifCount = notifications.filter((n) => !n.read).length;
 
   const scrollToCatalog = () => {
@@ -532,9 +423,7 @@ export default function App() {
       <Header
         currentView={currentView}
         onNavigate={(v) => setCurrentView(v)}
-        cartCount={totalCartCount}
         unreadNotificationsCount={unreadNotifCount}
-        onOpenCart={() => setIsCartOpen(true)}
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
         onSearchFocus={scrollToCatalog}
         settings={settings}
@@ -556,7 +445,7 @@ export default function App() {
                     Acervo do Cofre
                   </h2>
                   <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-                    Itens raros com certificação de autenticidade e pronta entrega nacional
+                    Curadoria exclusiva de itens raros com certificação de autenticidade
                   </p>
                 </div>
 
@@ -573,7 +462,16 @@ export default function App() {
               />
 
               {/* Product Grid (3-4 columns desktop, 2 tablet, 1-2 mobile) */}
-              {filteredProducts.length === 0 ? (
+              {products.length === 0 ? (
+                <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
+                  <Package className="w-12 h-12 mx-auto text-slate-300" />
+                  <h3 className="text-base font-bold text-slate-800">Catálogo em preparação</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Nosso cofre está sendo abastecido com novas relíquias. Em breve você encontrará aqui
+                    itens exclusivos com curadoria e certificação de autenticidade.
+                  </p>
+                </div>
+              ) : filteredProducts.length === 0 ? (
                 <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
                   <Package className="w-12 h-12 mx-auto text-slate-300" />
                   <h3 className="text-base font-bold text-slate-800">Nenhum colecionável encontrado</h3>
@@ -604,7 +502,6 @@ export default function App() {
                       key={item.id}
                       item={item}
                       onSelect={(it) => setSelectedProduct(it)}
-                      onAddToCart={handleAddToCart}
                     />
                   ))}
                 </div>
@@ -737,41 +634,7 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-slate-500">
-              {settings.payments.pix.enabled && (
-                <span>PIX Instantâneo ({settings.payments.pix.discountPercent}% OFF)</span>
-              )}
-              {settings.payments.creditCard.enabled && (
-                <>
-                  <span>·</span>
-                  <span>Cartão em até {settings.payments.creditCard.maxInstallments}x</span>
-                </>
-              )}
-              {settings.payments.boleto.enabled && (
-                <>
-                  <span>·</span>
-                  <span>Boleto Bancário</span>
-                </>
-              )}
-              {settings.payments.digitalWallets.picpay && (
-                <>
-                  <span>·</span>
-                  <span className="text-emerald-700 font-semibold">PicPay</span>
-                </>
-              )}
-              {settings.payments.digitalWallets.mercadopago && (
-                <>
-                  <span>·</span>
-                  <span className="text-blue-700 font-semibold">Mercado Pago</span>
-                </>
-              )}
-              {settings.payments.digitalWallets.nupay && (
-                <>
-                  <span>·</span>
-                  <span className="text-purple-700 font-semibold">NuPay</span>
-                </>
-              )}
-              <span>·</span>
-              <span>Sedex com Seguro Total</span>
+              <span>Sedex com Seguro Total para todo o Brasil</span>
             </div>
           </div>
         </div>
@@ -781,9 +644,7 @@ export default function App() {
       <BottomTabBar
         currentView={currentView}
         onNavigate={(v) => setCurrentView(v)}
-        cartCount={totalCartCount}
         ordersCount={orders.length}
-        onOpenCart={() => setIsCartOpen(true)}
         onSearchFocus={scrollToCatalog}
       />
 
@@ -791,30 +652,6 @@ export default function App() {
       <ProductDetailModal
         item={selectedProduct}
         onClose={() => setSelectedProduct(null)}
-        onAddToCart={handleAddToCart}
-        onBuyNow={handleBuyNow}
-      />
-
-      {/* Cart Drawer */}
-      <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cart={cart}
-        onUpdateQuantity={handleUpdateCartQuantity}
-        onRemoveItem={handleRemoveCartItem}
-        onProceedToCheckout={() => {
-          setIsCartOpen(false);
-          setIsCheckoutOpen(true);
-        }}
-      />
-
-      {/* Checkout Modal with Brazilian Payment Systems */}
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        cart={cart}
-        onOrderCreated={handleOrderCreated}
-        settings={settings}
       />
 
       {/* Notifications Drawer */}

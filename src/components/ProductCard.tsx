@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { CollectibleItem } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
-import { ShoppingBag, ShieldCheck, Eye, Sparkles } from 'lucide-react';
+import { ShieldCheck, Eye, Sparkles } from 'lucide-react';
 
 interface ProductCardProps {
   item: CollectibleItem;
   onSelect: (item: CollectibleItem) => void;
-  onAddToCart: (item: CollectibleItem) => void;
 }
 
 const RARITY_LABELS: Record<string, { label: string; textClass: string }> = {
@@ -27,7 +26,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   vinyl: 'Vinis Históricos',
 };
 
-export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect, onAddToCart }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect }) => {
   const [imageError, setImageError] = useState(false);
   const rarityInfo = RARITY_LABELS[item.rarity] || { label: item.rarity, textClass: 'text-slate-600' };
 
@@ -116,30 +115,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect, onAddT
           </div>
         </div>
 
-        {/* Pricing & Add to Cart button */}
+        {/* Pricing — vitrine (compra indisponível até integração de gateway) */}
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-          <div>
-            <div className="text-base font-bold text-slate-900 font-mono-nums tracking-tight">
-              {formatCurrencyBRL(item.price)}
-            </div>
-            <div className="text-[10px] text-slate-500">
-              em até 6x de <span className="font-semibold text-slate-700 font-mono-nums">{formatCurrencyBRL(item.price / 6)}</span> s/ juros
-            </div>
+          <div className="text-base font-bold text-slate-900 font-mono-nums tracking-tight">
+            {formatCurrencyBRL(item.price)}
           </div>
-
-          <button
-            onClick={() => onAddToCart(item)}
-            disabled={item.stock === 0}
-            className={`min-h-[44px] min-w-[44px] p-2.5 rounded-xl transition flex items-center justify-center shadow-xs active:scale-95 ${
-              item.stock > 0
-                ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
-            title={item.stock > 0 ? 'Adicionar ao Carrinho' : 'Item Esgotado'}
-            aria-label={`Comprar ${item.name}`}
-          >
-            <ShoppingBag className="w-4 h-4" />
-          </button>
+          <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold">
+            Consulte disponibilidade
+          </span>
         </div>
       </div>
     </div>
