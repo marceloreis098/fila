@@ -44,6 +44,7 @@ import {
   updateLeadStatus,
   dbHealth,
   counts,
+  closeDb,
 } from './db.js';
 
 dotenv.config();
@@ -291,6 +292,54 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
+// Fábrica de limitadores por IP (janela deslizante) — usado em endpoints
+// de escrita (leads, pedidos) para impedir spam e abuso direcionado.
+function createIpLimiter({ max, windowMs }) {
+  const hits = new Map();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of hits) {
+      if (now > entry.resetAt) hits.delete(key);
+    }
+  }, Math.min(windowMs, 60_000)).unref();
+  return (req, res, next) => {
+    const ip = clientIp(req);
+    const now = Date.now();
+    const entry = hits.get(ip);
+    if (!entry || now > entry.resetAt) {
+      hits.set(ip, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > max) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      return res.status(429).json({ error: `Muitas tentativas. Aguarde ${retryAfter}s.`, retryAfter });
+    }
+    return next();
+  };
+}
+
+// Limites dedicados: leads 6/min/IP; criação de pedido PIX 10/min/IP.
+const limitLeads = createIpLimiter({ max: 6, windowMs: 60_000 });
+const limitPixOrders = createIpLimiter({ max: 10, windowMs: 60_000 });
+
+// Tokens de "etapa" (password/setup) de uso único — um pendingToken/setupToken
+// não pode ser reutilizado para emitir múltiplas sessões (anti-replay).
+const consumedTokens = new Map(); // jti -> exp(ms)
+setInterval(() => {
+  const now = Date.now();
+  for (const [jti, exp] of consumedTokens) {
+    if (exp < now) consumedTokens.delete(jti);
+  }
+}, 5 * 60 * 1000).unref();
+
+function consumeToken(payload) {
+  if (!payload?.jti) return false;
+  if (consumedTokens.has(payload.jti)) return false;
+  consumedTokens.set(payload.jti, (payload.exp || 0) * 1000);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Aplicação Express
 // ---------------------------------------------------------------------------
@@ -310,7 +359,7 @@ function clientIp(req) {
   return req.socket.remoteAddress || 'unknown';
 }
 
-// Headers de segurança (CSP restrita; permite Google Fonts e imagens remotas)
+// Headers de segurança (CSP estrita, COOP/CORP, Permissions-Policy)
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -329,10 +378,54 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    permissionsPolicy: {
+      features: {
+        camera: ["'self'"],
+        microphone: [],
+        geolocation: [],
+        payment: [],
+        usb: [],
+        accelerometer: [],
+        magnetometer: [],
+        gyroscope: [],
+        'interest-cohort': [],
+      },
+    },
   })
 );
 
-app.use(express.json({ limit: '32kb' }));
+// CORS: nenhuma origem desconhecida pode LER respostas da API.
+// Headers só são emitidos para origens da allowlist (APP_URL + CORS_ORIGINS).
+const ALLOWED_ORIGINS = new Set(
+  [APP_URL, 'http://localhost:3001', 'http://127.0.0.1:3001', ...(process.env.CORS_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean) || [])]
+    .filter(Boolean)
+);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (req.method === 'OPTIONS') {
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      res.setHeader('Vary', 'Origin');
+      return res.status(204).end();
+    }
+    return res.status(403).json({ error: 'Origem não permitida.' });
+  }
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  next();
+});
+
+// Parser JSON rígido: só objetos/arrays no topo, profundidade limitada, 32kb.
+app.use(express.json({ limit: '32kb', strict: true, depth: 8 }));
+
+// Sanitização de logs (evita injeção de logs/controle de terminal)
+const sanitizeLog = (v) => String(v ?? '').replace(/[\r\n\u0000-\u001f]/g, ' ').slice(0, 2000);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ ok: true, db: dbHealth(), counts: counts() }));
@@ -369,7 +462,7 @@ app.get('/api/settings', (_req, res) => {
   res.json({ settings: stored });
 });
 
-app.post('/api/leads', (req, res) => {
+app.post('/api/leads', limitLeads, (req, res) => {
   const { name = '', email = '', phone = '', itemId = '', itemName = '', message = '' } = req.body || {};
   if (!safeStr(name).trim() || (!safeStr(email).trim() && !safeStr(phone).trim())) {
     return res.status(400).json({ error: 'Informe seu nome e um e-mail ou WhatsApp para contato.' });
@@ -390,9 +483,12 @@ app.post('/api/admin/login', asyncHandler(async (req, res) => {
 
   const { email = '', password = '' } = req.body || {};
   const emailOk = String(email).trim().toLowerCase() === ADMIN_EMAIL;
+  // Calcula sempre o scrypt (independente do e-mail) para não vazar,
+  // via tempo de resposta, se o e-mail existe ou não (anti-enumeração).
   const passOk = verifyPassword(String(password), bootstrap.passwordHash);
+  const credentialsOk = emailOk && passOk;
 
-  if (!emailOk || !passOk) {
+  if (!credentialsOk) {
     const entry = recordFailure(key);
     if (entry.lockedUntil > 0) {
       const retryAfter = Math.ceil((entry.lockedUntil - Date.now()) / 1000);
@@ -464,6 +560,11 @@ app.post('/api/admin/mfa-verify', asyncHandler(async (req, res) => {
     return res.status(401).json({ error: 'Código MFA incorreto ou expirado. Use o código atual do seu autenticador.' });
   }
 
+  // Token de etapa é de uso único (anti-replay)
+  if (!consumeToken(payload)) {
+    return res.status(401).json({ error: 'Sessão de login já utilizada. Refaça o login.' });
+  }
+
   clearAttempts(key);
   const sessionToken = issueToken(ADMIN_EMAIL, 'full', 8 * 60 * 60);
   return res.json({ sessionToken, email: ADMIN_EMAIL, expiresAt: Math.floor(Date.now() / 1000) + 8 * 60 * 60 });
@@ -516,6 +617,9 @@ app.post('/api/admin/mfa-setup-confirm', asyncHandler(async (req, res) => {
 
   persistMfaSecret(pending.secret);
   pendingSetupSecrets.delete(token);
+  if (!consumeToken(payload)) {
+    return res.status(401).json({ error: 'Sessão de configuração já utilizada. Refaça o login.' });
+  }
   clearAttempts(key);
 
   const sessionToken = issueToken(ADMIN_EMAIL, 'full', 8 * 60 * 60);
@@ -692,7 +796,7 @@ async function mpCreatePix(order) {
 }
 
 // Criação de pedido com PIX via gateway (somente quando checkout estiver ativo)
-app.post('/api/orders/pix', asyncHandler(async (req, res) => {
+app.post('/api/orders/pix', limitPixOrders, asyncHandler(async (req, res) => {
   const { customer, items, subtotal = 0, shipping = 0, discount = 0 } = req.body || {};
   if (!customer || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Dados do pedido incompletos.' });
@@ -727,15 +831,45 @@ app.post('/api/orders/pix', asyncHandler(async (req, res) => {
 }));
 
 // Webhook do gateway (atualiza status do pedido)
-app.post('/api/webhooks/mercadopago', express.raw({ type: '*/*', limit: '32kb' }), (req, res) => {
-  // Ação da MP: quando o pagamento é aprovado, o webhook traz payment_id.
-  // Sem credenciais validáveis, registra apenas o recebimento (seguro por design).
+// Assinatura verificada (x-signature v1) — sem token ou assinatura inválida,
+// o webhook é rejeitado (não confia em payload não autenticado).
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN?.trim() || null;
+
+function verifyMpWebhook(req) {
+  if (!MP_ACCESS_TOKEN) return { ok: false, missing: true };
+  const sigHeader = String(req.headers['x-signature'] || '');
+  const tsMatch = /(?:^|,)ts=(\d+)/.exec(sigHeader);
+  const v1Match = /(?:^|,)v1=([0-9a-f]+)/i.exec(sigHeader);
+  if (!tsMatch || !v1Match) return { ok: false };
+  const ts = Number(tsMatch[1]);
+  if (!Number.isFinite(ts) || Math.abs(Math.floor(Date.now() / 1000) - ts) > 300) return { ok: false };
+  const data = req.body || {};
+  const manifest = `id:${data?.id ?? ''};request-id:${data?.request_id ?? ''};ts:${tsMatch[1]}`;
+  const expected = crypto
+    .createHmac('sha256', MP_ACCESS_TOKEN)
+    .update(manifest)
+    .digest('hex');
+  const received = v1Match[1].toLowerCase();
+  if (expected.toLowerCase() !== received) return { ok: false };
+  return { ok: true };
+}
+
+app.post('/api/webhooks/mercadopago', express.raw({ type: '*/*', limit: '16kb' }), (req, res) => {
+  const check = verifyMpWebhook(req);
+  if (check.missing) {
+    return res.status(404).end(); // gateway inativo — endpoint inexistente
+  }
+  if (!check.ok) {
+    return res.status(401).json({ error: 'Assinatura de webhook inválida.' });
+  }
   try {
-    const body = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString('utf8') || '{}') : req.body;
-    console.log('[RelicVault] Webhook MercadoPago recebido:', JSON.stringify(body).slice(0, 400));
-    res.status(200).json({ received: true });
+    const data = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString('utf8') || '{}') : req.body;
+    console.log(
+      `[RelicVault] Webhook MercadoPago: id=${sanitizeLog(data?.id)} action=${sanitizeLog(data?.action)} type=${sanitizeLog(data?.type)}`
+    );
+    return res.status(200).json({ received: true });
   } catch {
-    res.status(400).json({ error: 'Payload inválido.' });
+    return res.status(400).json({ error: 'Payload inválido.' });
   }
 });
 
@@ -817,9 +951,31 @@ async function main() {
   bootLog.push('==============================================================', '');
   console.log(bootLog.join('\n'));
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[RelicVault] Servidor de autenticação, dados e loja em http://localhost:${PORT} (API /api/*)`);
   });
+
+  // Hardening de conexão (mitiga slowloris, conexões zumbi e flood por socket)
+  server.headersTimeout = 20 * 1000;
+  server.requestTimeout = 30 * 1000;
+  server.keepAliveTimeout = 6 * 1000;
+  server.maxRequestsPerSocket = 100;
+
+  // Shutdown gracioso (fecha conexões e o banco SQLite de forma segura)
+  const shutdown = (signal) => {
+    console.log(`[RelicVault] Recebido ${signal} — encerrando...`);
+    server.close(() => {
+      try {
+        closeDb();
+      } catch {
+        /* já fechado */
+      }
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 5000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 main().catch((err) => {

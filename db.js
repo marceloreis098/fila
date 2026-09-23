@@ -9,7 +9,7 @@
 import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, chmodSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, 'data');
@@ -20,6 +20,21 @@ mkdirSync(DATA_DIR, { recursive: true });
 const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+// Permissões restritas no arquivo do banco (apenas o dono lê/escreve)
+try {
+  chmodSync(DB_FILE, 0o600);
+} catch {
+  /* melhor esforço */
+}
+
+export function closeDb() {
+  try {
+    db.close();
+  } catch {
+    /* já fechado */
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -113,22 +128,37 @@ const toProduct = (row) => {
   };
 };
 
+// Imagens: apenas data:image/* (upload local) ou URLs http(s)/caminhos locais.
+// Bloqueia javascript:, data:text/html e outros esquemas perigosos.
+const sanitizeImageUrl = (value) => {
+  const v = String(value || '').slice(0, 3000);
+  if (!v) return '';
+  if (/^data:image\/(png|jpe?g|webp|gif|avif)/i.test(v)) return v;
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^\//.test(v)) return v; // assets locais (hero, ícones)
+  return '';
+};
+
 const fromProduct = (p) => ({
   id: String(p.id),
   name: String(p.name || '').slice(0, 300),
   category: String(p.category || 'tcg'),
   rarity: String(p.rarity || 'raro'),
-  condition: String(p.condition || ''),
+  condition: String(p.condition || '').slice(0, 200),
   year: Number(p.year) || 2024,
   price: Number(p.price) || 0,
   original_price: p.originalPrice != null ? Number(p.originalPrice) : null,
   stock: Math.max(0, Math.floor(Number(p.stock) || 0)),
   featured: p.featured ? 1 : 0,
-  image: String(p.image || ''),
-  description: String(p.description || ''),
-  authenticity_cert: String(p.authenticityCert || ''),
-  franchise: String(p.franchise || ''),
-  specs_json: JSON.stringify(Array.isArray(p.specs) ? p.specs : []),
+  image: sanitizeImageUrl(p.image),
+  description: String(p.description || '').slice(0, 5000),
+  authenticity_cert: String(p.authenticityCert || '').slice(0, 500),
+  franchise: String(p.franchise || '').slice(0, 200),
+  specs_json: JSON.stringify(
+    (Array.isArray(p.specs) ? p.specs : [])
+      .slice(0, 40)
+      .map((s) => ({ label: String(s?.label || '').slice(0, 120), value: String(s?.value || '').slice(0, 300) }))
+  ),
   published: p.published === false ? 0 : 1,
 });
 

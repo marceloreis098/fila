@@ -10,7 +10,7 @@
  * Nenhuma credencial, código de backup ou chave é exibida nesta tela.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShieldCheck,
   Lock,
@@ -278,6 +278,33 @@ export const AdminSecurityGuard: React.FC<AdminSecurityGuardProps> = ({ children
     setLockSeconds(0);
     setServerOnline(true);
   }, [session]);
+
+  // Contra roubo de sessão por abandono: encerra automaticamente após 15 min
+  // de inatividade do usuário no painel.
+  const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const handleLogoutRef = useRef(handleLogout);
+  handleLogoutRef.current = handleLogout;
+
+  useEffect(() => {
+    if (!session) return;
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    let lastActivity = Date.now();
+    const onActivity = () => {
+      lastActivity = Date.now();
+    };
+    events.forEach((ev) => window.addEventListener(ev, onActivity, { passive: true }));
+    const timer = setInterval(() => {
+      if (sessionRef.current && Date.now() - lastActivity > IDLE_TIMEOUT_MS) {
+        handleLogoutRef.current();
+      }
+    }, 30 * 1000);
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, onActivity));
+      clearInterval(timer);
+    };
+  }, [session, IDLE_TIMEOUT_MS]);
 
   // Verificando sessão ao entrar no painel
   if (checking) {
