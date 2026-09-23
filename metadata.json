@@ -1,0 +1,6 @@
+{
+  "name": "RelicVault - Loja de Colecionáveis",
+  "description": "Loja virtual de colecionáveis raros, TCG, estátuas e raridades com pagamentos seguros via PIX, Cartão e Boleto, além de painel administrativo e rastreamento de pedidos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
