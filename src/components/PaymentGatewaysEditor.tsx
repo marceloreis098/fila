@@ -506,7 +506,7 @@ export const PaymentGatewaysEditor: React.FC<PaymentGatewaysEditorProps> = ({
           {savedSuccess && (
             <span className="text-emerald-700 font-bold text-xs flex items-center gap-1 animate-in fade-in">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Regras de pagamento salvas e ativadas no checkout!</span>
+              <span>Regras de pagamento salvas. O checkout online será ativado quando o gateway PIX estiver configurado.</span>
             </span>
           )}
 

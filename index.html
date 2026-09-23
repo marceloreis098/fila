@@ -3,12 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>RelicVault | Loja de Colecionáveis Raros</title>
-    <meta name="description" content="Loja virtual exclusiva de colecionáveis raros, TCG, estátuas e moedas com pagamentos seguros via PIX, Cartão e Boleto, além de painel administrativo e rastreamento de pedidos." />
-    <meta property="og:title" content="RelicVault | Loja de Colecionáveis Raros" />
-    <meta property="og:description" content="Loja virtual exclusiva de colecionáveis raros, TCG, estátuas e moedas com pagamentos seguros via PIX, Cartão e Boleto, além de painel administrativo e rastreamento de pedidos." />
+    <title>RelicVault | Colecionáveis Raros, TCG e Moedas com Autenticidade Certificada</title>
+    <meta name="description" content="Loja virtual brasileira de colecionáveis raros, cartas TCG, estátuas numeradas e moedas históricas. Curadoria exclusiva, certificado de autenticidade em cada peça e envio blindado Sedex com seguro total para todo o Brasil." />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Social -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RelicVault Colecionáveis" />
+    <meta property="og:title" content="RelicVault | Colecionáveis Raros com Autenticidade Certificada" />
+    <meta property="og:description" content="Curadoria exclusiva de cartas TCG raras, estátuas, moedas imperiais e retrogames lacrados. Certificado de autenticidade e envio blindado com seguro total." />
+    <meta property="og:image" content="/pwa-512x512.png" />
+    <meta property="og:locale" content="pt_BR" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RelicVault | Colecionáveis Raros" />
+    <meta name="twitter:description" content="Curadoria exclusiva de colecionáveis raros com certificado de autenticidade e envio seguro para todo o Brasil." />
+    <meta name="twitter:image" content="/pwa-512x512.png" />
+
+    <!-- PWA -->
     <meta name="theme-color" content="#0F172A" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,6 +30,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Dados estruturados (Schema.org) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Store",
+      "name": "RelicVault Colecionáveis",
+      "image": "/pwa-512x512.png",
+      "description": "Loja virtual brasileira de colecionáveis raros, cartas TCG, estátuas numeradas, moedas históricas e retrogames lacrados, com certificado de autenticidade e envio blindado Sedex.",
+      "currenciesAccepted": "BRL",
+      "paymentAccepted": "PIX, Cartão de crédito, Boleto",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Av. Rio Branco, 156 - Centro",
+        "addressLocality": "Rio de Janeiro",
+        "addressRegion": "RJ",
+        "addressCountry": "BR"
+      },
+      "areaServed": "BR"
+    }
+    </script>
   </head>
   <body class="bg-[#FAFAF9] text-slate-900 antialiased selection:bg-amber-100 selection:text-amber-900">
     <div id="root"></div>

@@ -1,18 +1,25 @@
 import React from 'react';
-import { CollectibleItem } from '../types';
+import { CollectibleItem, StoreSiteSettings } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
-import { X, ShieldCheck, Truck, Award, Lock } from 'lucide-react';
+import { productWhatsAppMessage, whatsAppLink } from '../utils/wa';
+import { LeadCaptureForm } from './LeadCaptureForm';
+import { X, ShieldCheck, Truck, Award, Lock, MessageCircle, Phone } from 'lucide-react';
 
 interface ProductDetailModalProps {
   item: CollectibleItem | null;
   onClose: () => void;
+  settings: StoreSiteSettings;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   item,
   onClose,
+  settings,
 }) => {
   if (!item) return null;
+
+  const isOut = item.stock <= 0;
+  const waHref = whatsAppLink(settings.contacts.whatsappNumber, productWhatsAppMessage(settings, item));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
@@ -66,7 +73,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {item.name}
           </h2>
 
-          {/* Price Block — vitrine (compra indisponível até gateway real) */}
+          {/* Price Block — venda por atendimento (WhatsApp) */}
           <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
             <div className="flex items-baseline gap-2">
               <span className="text-2xl md:text-3xl font-bold text-slate-900 font-mono-nums">
@@ -79,7 +86,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               )}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              Valor de referência da curadoria · disponibilidade sob consulta
+              {isOut ? 'Item esgotado no momento — entre na fila de interesse ou consulte o atendimento.' : 'Venda por atendimento personalizado via WhatsApp, com envio blindado e seguro total.'}
             </div>
           </div>
 
@@ -120,14 +127,36 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Purchase disabled notice */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-center">
-              A compra online está temporariamente desativada.
-              <span className="block text-[11px] text-amber-800 mt-0.5">
-                Consulte a disponibilidade pelo WhatsApp ou telefone da loja.
-              </span>
-            </div>
+          {/* Purchase module — venda por atendimento WhatsApp */}
+          <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`w-full flex items-center justify-center gap-2 h-11 rounded-xl text-white text-sm font-bold shadow-md transition active:scale-98 ${
+                isOut ? 'bg-slate-500 hover:bg-slate-600' : 'bg-emerald-600 hover:bg-emerald-700'
+              }`}
+            >
+              <MessageCircle className="w-4.5 h-4.5" />
+              <span>{isOut ? 'Consultar disponibilidade no WhatsApp' : 'Comprar pelo WhatsApp'}</span>
+            </a>
+
+            <a
+              href={`tel:${settings.contacts.phoneRaw || '21900000000'}`}
+              className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition active:scale-98"
+            >
+              <Phone className="w-4 h-4 text-amber-600" />
+              <span>Falar por telefone: {settings.contacts.phone}</span>
+            </a>
+
+            {isOut && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] font-bold text-slate-700 mb-2 text-center">
+                  Esgotado por enquanto? Deixe seu contato e avisamos quando voltar:
+                </div>
+                <LeadCaptureForm itemName={item.name} itemId={item.id} variant="product" />
+              </div>
+            )}
           </div>
         </div>
       </div>

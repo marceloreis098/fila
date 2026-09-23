@@ -16,7 +16,7 @@ export default defineConfig(() => {
           id: '/',
           name: 'RelicVault Colecionáveis',
           short_name: 'RelicVault',
-          description: 'Loja virtual de colecionáveis raros, TCG, action figures e moedas com pagamentos seguros.',
+          description: 'Loja virtual de colecionáveis raros, TCG, action figures e moedas com autenticidade certificada.',
           theme_color: '#0F172A',
           background_color: '#FAFAF9',
           display: 'standalone',

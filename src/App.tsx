@@ -26,12 +26,26 @@ import { AdminPanel } from './components/AdminPanel';
 import { AdminSecurityGuard } from './components/AdminSecurityGuard';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
-import { 
-  Package, 
-  Bell, 
+import { LeadCaptureForm } from './components/LeadCaptureForm';
+import {
+  fetchStoreProducts,
+  fetchStoreSettings,
+  adminSaveProduct,
+  adminDeleteProduct,
+  adminSaveSettings,
+  adminUpdateOrderStatus,
+  adminMigrate,
+} from './utils/api';
+import { productWhatsAppMessage, whatsAppLink } from './utils/wa';
+import {
+  Package,
+  Bell,
   Smartphone,
   Phone,
-  MessageCircle
+  MessageCircle,
+  ShieldCheck,
+  Search,
+  Truck,
 } from 'lucide-react';
 
 const STORAGE_KEYS = {
@@ -177,6 +191,38 @@ export default function App() {
     }
   }, [notifications]);
 
+  // Carrega produtos e configurações do servidor (SQLite) quando disponível;
+  // mantém o localStorage como fallback/cache para uso offline.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [serverProducts, serverSettings] = await Promise.all([
+        fetchStoreProducts(),
+        fetchStoreSettings(),
+      ]);
+      if (cancelled) return;
+
+      if (serverProducts && serverProducts.length >= 0) {
+        setProducts((prev) => {
+          const prevIds = new Set(prev.map((p) => p.id));
+          const merged = [...serverProducts];
+          // preserva itens locais (admin sem servidor/offline) que ainda não foram salvos
+          for (const p of prev) {
+            if (!merged.some((m) => m.id === p.id)) merged.push(p);
+          }
+          return merged.map(sanitizeCollectibleItem);
+        });
+      }
+
+      if (serverSettings && typeof serverSettings === 'object') {
+        setSettings((prev) => ({ ...DEFAULT_SITE_SETTINGS, ...serverSettings }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Automated notification dispatcher
   const pushNotification = (
     title: string,
@@ -206,6 +252,9 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+    adminSaveSettings(newSettings).catch(() => {
+      /* sem sessão/servidor — mantém no localStorage */
+    });
     pushNotification(
       'Configurações Salvas',
       'As alterações do site foram aplicadas com sucesso.',
@@ -274,6 +323,12 @@ export default function App() {
       })
     );
 
+    // Sincroniza status no servidor (SQLite) — notificações continuam no cliente
+    const tracking = orders.find((o) => o.id === orderId)?.trackingCode;
+    adminUpdateOrderStatus(orderId, newStatus, tracking).catch(() => {
+      /* servidor indisponível — status permanece local */
+    });
+
     // Automatically push system notification
     let notifTitle = '';
     let notifMsg = '';
@@ -306,9 +361,12 @@ export default function App() {
     }
   };
 
-  // Admin Product updates
+  // Admin Product updates (persistidos no servidor + cache local)
   const handleAddProduct = (item: CollectibleItem) => {
     setProducts((prev) => [item, ...prev]);
+    adminSaveProduct(item).catch(() => {
+      /* sem sessão/servidor — item fica apenas local */
+    });
     pushNotification(
       'Novo Item no Cofre',
       `O item "${item.name}" foi catalogado e adicionado ao estoque da loja.`,
@@ -318,10 +376,16 @@ export default function App() {
 
   const handleUpdateProduct = (item: CollectibleItem) => {
     setProducts((prev) => prev.map((p) => (p.id === item.id ? item : p)));
+    adminSaveProduct(item).catch(() => {
+      /* sem sessão/servidor — item fica apenas local */
+    });
   };
 
   const handleDeleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
+    adminDeleteProduct(id).catch(() => {
+      /* sem sessão/servidor — item fica apenas local */
+    });
   };
 
   const handleResetCatalog = () => {
@@ -406,6 +470,20 @@ export default function App() {
       {/* Offline Alert Indicator */}
       <OfflineIndicator />
 
+      {/* Floating WhatsApp Button */}
+      <a
+        href={whatsAppLink(
+          settings.contacts.whatsappNumber,
+          `Olá! Quero falar com o atendimento da ${settings.storeName}.`
+        )}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Falar com a loja no WhatsApp"
+        className="fixed bottom-20 md:bottom-6 right-4 z-40 w-13 h-13 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl flex items-center justify-center transition active:scale-95"
+      >
+        <MessageCircle className="w-6 h-6" />
+      </a>
+
       {/* Floating Instant Toast */}
       {activeToast && (
         <div className="fixed bottom-20 md:bottom-6 right-4 z-50 max-w-sm bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 flex items-start gap-3 animate-in slide-in-from-bottom-3 duration-200">
@@ -463,13 +541,27 @@ export default function App() {
 
               {/* Product Grid (3-4 columns desktop, 2 tablet, 1-2 mobile) */}
               {products.length === 0 ? (
-                <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
+                <div className="py-16 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-4">
                   <Package className="w-12 h-12 mx-auto text-slate-300" />
-                  <h3 className="text-base font-bold text-slate-800">Catálogo em preparação</h3>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Nosso cofre está sendo abastecido com novas relíquias. Em breve você encontrará aqui
-                    itens exclusivos com curadoria e certificação de autenticidade.
-                  </p>
+                  <div className="space-y-1.5">
+                    <h3 className="text-base font-bold text-slate-800">Catálogo em preparação</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      Nosso cofre está sendo abastecido com novas relíquias. Em breve você encontrará aqui
+                      itens exclusivos com curadoria e certificação de autenticidade.
+                    </p>
+                  </div>
+                  <LeadCaptureForm variant="catalog" />
+                  <div className="pt-1">
+                    <a
+                      href={whatsAppLink(settings.contacts.whatsappNumber, `Olá! Quero saber quando o acervo da ${settings.storeName} estiver disponível.`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition active:scale-95"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Falar com o atendimento no WhatsApp
+                    </a>
+                  </div>
                 </div>
               ) : filteredProducts.length === 0 ? (
                 <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
@@ -502,6 +594,7 @@ export default function App() {
                       key={item.id}
                       item={item}
                       onSelect={(it) => setSelectedProduct(it)}
+                      settings={settings}
                     />
                   ))}
                 </div>
@@ -523,6 +616,34 @@ export default function App() {
 
                 <div className="shrink-0">
                   <PWAInstallButton />
+                </div>
+              </div>
+
+              {/* Como funciona a compra — venda por atendimento */}
+              <div className="mt-12">
+                <div className="text-center mb-6">
+                  <h3 className="text-xl font-bold tracking-tight text-slate-900">
+                    Como funciona a compra
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Atendimento personalizado com curadoria e envio protegido em todo o Brasil
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { icon: Search, title: '1. Escolha a peça', text: 'Navegue pelo acervo e selecione o colecionável do seu interesse.' },
+                    { icon: MessageCircle, title: '2. Fale com o atendimento', text: 'Toque em "Comprar" e envie sua mensagem no WhatsApp com o item já preenchido.' },
+                    { icon: ShieldCheck, title: '3. Autenticidade conferida', text: 'Conferimos a peça, a certificação e as condições de envio blindado com seguro total Sedex.' },
+                    { icon: Truck, title: '4. Receba em casa', text: 'Enviamos com código de rastreamento e você acompanha a entrega pelo app.' },
+                  ].map((step) => (
+                    <div key={step.title} className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs text-center">
+                      <div className="w-11 h-11 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center mx-auto mb-3">
+                        <step.icon className="w-5 h-5" />
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">{step.title}</div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{step.text}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -652,6 +773,7 @@ export default function App() {
       <ProductDetailModal
         item={selectedProduct}
         onClose={() => setSelectedProduct(null)}
+        settings={settings}
       />
 
       {/* Notifications Drawer */}

@@ -1,0 +1,9 @@
+# RelicVault — Colecionáveis raros, TCG, estátuas e moedas com autenticidade certificada
+# Sitemaps e crawlers são bem-vindos.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+Sitemap: /sitemap.xml

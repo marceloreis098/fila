@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { CollectibleItem } from '../types';
+import { CollectibleItem, StoreSiteSettings } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
-import { ShieldCheck, Eye, Sparkles } from 'lucide-react';
+import { productWhatsAppMessage, whatsAppLink } from '../utils/wa';
+import { ShieldCheck, Eye, Sparkles, MessageCircle } from 'lucide-react';
 
 interface ProductCardProps {
   item: CollectibleItem;
   onSelect: (item: CollectibleItem) => void;
+  settings: StoreSiteSettings;
 }
 
 const RARITY_LABELS: Record<string, { label: string; textClass: string }> = {
@@ -26,9 +28,14 @@ const CATEGORY_NAMES: Record<string, string> = {
   vinyl: 'Vinis Históricos',
 };
 
-export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect, settings }) => {
   const [imageError, setImageError] = useState(false);
   const rarityInfo = RARITY_LABELS[item.rarity] || { label: item.rarity, textClass: 'text-slate-600' };
+  const isOut = item.stock <= 0;
+  const waHref = whatsAppLink(
+    settings.contacts.whatsappNumber,
+    productWhatsAppMessage(settings, item)
+  );
 
   return (
     <div className="group relative flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-lg hover:border-amber-300/60 transition-all duration-300 overflow-hidden">
@@ -115,14 +122,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect }) => {
           </div>
         </div>
 
-        {/* Pricing — vitrine (compra indisponível até integração de gateway) */}
+        {/* Pricing + WhatsApp CTA */}
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
           <div className="text-base font-bold text-slate-900 font-mono-nums tracking-tight">
             {formatCurrencyBRL(item.price)}
           </div>
-          <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold">
-            Consulte disponibilidade
-          </span>
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition active:scale-95 ${
+              isOut
+                ? 'bg-slate-100 text-slate-500 pointer-events-none'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+            }`}
+            title={isOut ? 'Item esgotado — consulte no WhatsApp' : 'Consultar e comprar no WhatsApp'}
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>{isOut ? 'Esgotado' : 'Comprar'}</span>
+          </a>
         </div>
       </div>
     </div>

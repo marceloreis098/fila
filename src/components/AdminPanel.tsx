@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CollectibleItem, Order, OrderStatus, ItemCategory, ItemRarity, ItemCondition, StoreSiteSettings } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
+import { adminMigrate } from '../utils/api';
 import { ImagePicker } from './ImagePicker';
 import { SiteContentEditor } from './SiteContentEditor';
 import { PaymentGatewaysEditor } from './PaymentGatewaysEditor';
@@ -56,6 +57,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onResetSettings,
 }) => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'site_editor' | 'payment_methods' | 'metrics'>('inventory');
+
+  // Migração pontual: se o banco SQLite estiver vazio, envia os produtos e
+  // configurações que ainda estavam no localStorage. O servidor só migra uma vez.
+  useEffect(() => {
+    adminMigrate({ products, settings }).catch(() => {
+      /* servidor indisponível — dados seguem no localStorage */
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // New product form modal state
   const [showAddModal, setShowAddModal] = useState(false);
