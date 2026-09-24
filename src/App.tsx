@@ -81,6 +81,28 @@ const sanitizeCollectibleItem = (item: CollectibleItem): CollectibleItem => {
   };
 };
 
+const normalizeSettings = (saved: unknown): StoreSiteSettings => {
+  const base = DEFAULT_SITE_SETTINGS;
+  if (!saved || typeof saved !== 'object') return base;
+  const s = saved as Partial<StoreSiteSettings>;
+  return {
+    ...base,
+    ...s,
+    topBar: { ...base.topBar, ...(s.topBar || {}) },
+    hero: { ...base.hero, ...(s.hero || {}) },
+    contacts: { ...base.contacts, ...(s.contacts || {}) },
+    payments: {
+      ...base.payments,
+      ...(s.payments || {}),
+      pix: { ...base.payments.pix, ...((s.payments || {}).pix || {}) },
+      creditCard: { ...base.payments.creditCard, ...((s.payments || {}).creditCard || {}) },
+      boleto: { ...base.payments.boleto, ...((s.payments || {}).boleto || {}) },
+    },
+    categories:
+      Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : base.categories,
+  };
+};
+
 export default function App() {
   // Navigation View — inicializa e sincroniza com o hash da URL.
   // O painel administrativo é Oculto: não há botão/link público; o acesso
@@ -115,8 +137,8 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
       if (saved) {
-        const parsed: CollectibleItem[] = JSON.parse(saved);
-        return parsed.map(sanitizeCollectibleItem);
+        const parsed: unknown = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed.map(sanitizeCollectibleItem);
       }
     } catch {
       // fallback
@@ -128,7 +150,10 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ORDERS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch {
       // fallback
     }
@@ -139,7 +164,10 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch {
       // fallback
     }
@@ -160,7 +188,7 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (saved) {
-        return JSON.parse(saved);
+        return normalizeSettings(JSON.parse(saved));
       }
     } catch {
       // fallback
@@ -240,16 +268,8 @@ export default function App() {
       }
 
       if (serverSettings && typeof serverSettings === 'object') {
-        setSettings((prev) => ({
-          ...DEFAULT_SITE_SETTINGS,
-          ...serverSettings,
-          // merge profundo: dados da empresa (CNPJ/razão social/endereço) nunca
-          // se perdem quando o servidor/envio local tem settings antigas/parciais.
-          contacts: {
-            ...DEFAULT_SITE_SETTINGS.contacts,
-            ...(serverSettings?.contacts || {}),
-          },
-        }));
+        // merge profundo com os padrões: nunca quebra por shape antigo/parcial.
+        setSettings(normalizeSettings(serverSettings));
       }
     })();
     return () => {
