@@ -458,9 +458,22 @@ app.get('/api/products', (_req, res) => {
   res.json({ products: listProducts({ publishedOnly: true }) });
 });
 
+// Remove dados sensíveis/empresariais da resposta pública (CNPJ, razão social e endereço
+// nunca são expostos ao visitante — decisão do dono da loja).
+const publicSettings = (settings) => {
+  if (!settings || typeof settings !== 'object') return settings;
+  const copy = structuredClone(settings);
+  if (copy.contacts && typeof copy.contacts === 'object') {
+    delete copy.contacts.cnpj;
+    delete copy.contacts.companyName;
+    delete copy.contacts.address;
+  }
+  return copy;
+};
+
 app.get('/api/settings', (_req, res) => {
   const stored = getSettings();
-  res.json({ settings: stored });
+  res.json({ settings: publicSettings(stored) });
 });
 
 app.post('/api/leads', limitLeads, (req, res) => {

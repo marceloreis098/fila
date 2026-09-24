@@ -1,5 +1,6 @@
 import { StoreSiteSettings } from '../types';
 import { HERO_IMAGE } from './initialProducts';
+import { FALLBACK_CATEGORIES } from '../utils/catalog';
 
 export const DEFAULT_SITE_SETTINGS: StoreSiteSettings = {
   storeName: 'RelicVault',
@@ -27,9 +28,9 @@ export const DEFAULT_SITE_SETTINGS: StoreSiteSettings = {
     whatsappNumber: '5521900000000',
     email: 'sac@relicvault.com.br',
     supportHours: 'Segunda a Sexta, das 09h às 19h',
-    address: 'Av. Rio Branco, 156 - Centro, Rio de Janeiro - RJ',
-    cnpj: '48.291.048/0001-92',
-    companyName: 'RelicVault Colecionáveis & Numismática do Brasil Ltda.',
+    address: '',
+    cnpj: '',
+    companyName: '',
   },
   payments: {
     pix: {
@@ -60,4 +61,5 @@ export const DEFAULT_SITE_SETTINGS: StoreSiteSettings = {
       googlePay: true,
     },
   },
+  categories: FALLBACK_CATEGORIES,
 };

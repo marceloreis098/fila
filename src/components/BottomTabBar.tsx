@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Truck, Shield } from 'lucide-react';
+import { Home, Search, Truck } from 'lucide-react';
 
 interface BottomTabBarProps {
   currentView: 'store' | 'admin' | 'tracking';
@@ -16,7 +16,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 }) => {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg pb-safe">
-      <div className="grid grid-cols-4 items-center h-16 max-w-md mx-auto px-2">
+      <div className="grid grid-cols-3 items-center h-16 max-w-md mx-auto px-2">
         {/* Tab 1: Loja */}
         <button
           onClick={() => onNavigate('store')}
@@ -58,18 +58,8 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           </div>
           <span className="text-[10px] tracking-tight mt-1">Rastreio</span>
         </button>
-
-        {/* Tab 4: Admin */}
-        <button
-          onClick={() => onNavigate('admin')}
-          className={`min-h-[44px] min-w-[44px] flex flex-col items-center justify-center transition active:scale-90 ${
-            currentView === 'admin' ? 'text-amber-700 font-bold' : 'text-slate-500 hover:text-slate-800'
-          }`}
-          aria-label="Painel Administrativo"
-        >
-          <Shield className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1">Admin</span>
-        </button>
+        {/* O painel administrativo NÃO possui aba visível no mobile.
+            Acesso somente pelo caminho correto da URL (documentado no manual de uso). */}
       </div>
     </div>
   );

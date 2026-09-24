@@ -507,7 +507,7 @@ export const SiteContentEditor: React.FC<SiteContentEditorProps> = ({
                     contacts: { ...formData.contacts, address: e.target.value }
                   })}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
-                  placeholder="Av. Rio Branco, 156 - Centro, Rio de Janeiro - RJ"
+                  placeholder="Endereço comercial (não exibido publicamente)"
                 />
               </div>
 
@@ -525,7 +525,7 @@ export const SiteContentEditor: React.FC<SiteContentEditorProps> = ({
                     contacts: { ...formData.contacts, cnpj: e.target.value }
                   })}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-mono-nums"
-                  placeholder="48.291.048/0001-92"
+                  placeholder="CNPJ (não exibido publicamente)"
                 />
               </div>
 

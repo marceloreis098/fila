@@ -1,7 +1,7 @@
 import React from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { StoreSiteSettings } from '../types';
-import { Bell, Shield, Search, Phone, MessageCircle } from 'lucide-react';
+import { Bell, Search, Phone, MessageCircle } from 'lucide-react';
 
 interface HeaderProps {
   currentView: 'store' | 'admin' | 'tracking';
@@ -94,15 +94,8 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Rastreio de Pedidos
           </button>
-          <button
-            onClick={() => onNavigate('admin')}
-            className={`transition-colors hover:text-slate-900 whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-              currentView === 'admin' ? 'text-slate-900 font-bold border-b-2 border-amber-600 -mb-0.5 pb-0.5' : ''
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5 text-amber-600" />
-            <span>Painel Administrativo</span>
-          </button>
+          {/* O painel administrativo NÃO possui atalho visível no site.
+              Acesso somente pelo caminho correto da URL (documentado no manual de uso). */}
         </nav>
 
         {/* Zone 3: Primary actions (Search, Notifications, Cart, PWA Install) */}

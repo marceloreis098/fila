@@ -1,23 +1,15 @@
 import React, { useState } from 'react';
-import { FilterState, ItemCategory, ItemRarity } from '../types';
+import { FilterState, ItemCategory, ItemRarity, StoreCategoryDef } from '../types';
 import { Search, SlidersHorizontal, X, ArrowUpDown, Sparkles } from 'lucide-react';
 import { formatCurrencyBRL } from '../utils/payment';
+import { FALLBACK_CATEGORIES } from '../utils/catalog';
 
 interface FilterBarProps {
   filters: FilterState;
   onFilterChange: (newFilters: FilterState) => void;
   totalResults: number;
+  categories?: StoreCategoryDef[];
 }
-
-const CATEGORIES: { id: ItemCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'Todas Categorias' },
-  { id: 'tcg', label: 'Cartas TCG' },
-  { id: 'figures', label: 'Estátuas & Figures' },
-  { id: 'coins', label: 'Moedas Históricas' },
-  { id: 'retro', label: 'Retrogames' },
-  { id: 'comics', label: 'Quadrinhos Clássicos' },
-  { id: 'vinyl', label: 'Vinis Históricos' },
-];
 
 const RARITIES: { id: ItemRarity | 'all'; label: string }[] = [
   { id: 'all', label: 'Todas Raridades' },
@@ -32,8 +24,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   filters,
   onFilterChange,
   totalResults,
+  categories,
 }) => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  const categoryOptions: { id: ItemCategory | 'all'; label: string }[] = [
+    { id: 'all', label: 'Todas Categorias' },
+    ...(categories && categories.length ? categories : FALLBACK_CATEGORIES).map((c) => ({
+      id: c.id as ItemCategory,
+      label: c.label,
+    })),
+  ];
 
   const activeFiltersCount = 
     (filters.category !== 'all' ? 1 : 0) +
@@ -119,7 +120,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       <div className={`space-y-3 ${showMobileFilters ? 'block' : 'hidden md:block'}`}>
         {/* Categories Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {CATEGORIES.map((cat) => {
+          {categoryOptions.map((cat) => {
             const isActive = filters.category === cat.id;
             return (
               <button

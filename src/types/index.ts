@@ -1,4 +1,9 @@
-export type ItemCategory = 'tcg' | 'figures' | 'coins' | 'retro' | 'comics' | 'vinyl';
+export type ItemCategory = string; // categorias dinâmicas — gerenciadas no painel admin
+
+export interface StoreCategoryDef {
+  id: string;
+  label: string;
+}
 
 export type ItemRarity = 'comum' | 'raro' | 'epico' | 'lendario' | 'mitico' | 'graal';
 
@@ -179,5 +184,6 @@ export interface StoreSiteSettings {
   hero: StoreHeroConfig;
   contacts: StoreContactConfig;
   payments: PaymentGatewaysConfig;
+  categories: StoreCategoryDef[];
 }
 

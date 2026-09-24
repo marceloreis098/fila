@@ -5,6 +5,8 @@ import { adminMigrate } from '../utils/api';
 import { ImagePicker } from './ImagePicker';
 import { SiteContentEditor } from './SiteContentEditor';
 import { PaymentGatewaysEditor } from './PaymentGatewaysEditor';
+import { StoreCategoryDef } from '../types';
+import { FALLBACK_CATEGORIES, slugifyCategory } from '../utils/catalog';
 import { 
   Plus, 
   Minus,
@@ -56,7 +58,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveSettings,
   onResetSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'site_editor' | 'payment_methods' | 'metrics'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'categories' | 'site_editor' | 'payment_methods' | 'metrics'>('inventory');
 
   // Migração pontual: se o banco SQLite estiver vazio, envia os produtos e
   // configurações que ainda estavam no localStorage. O servidor só migra uma vez.
@@ -90,6 +92,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Full Edit product state
   const [editingProduct, setEditingProduct] = useState<CollectibleItem | null>(null);
+
+  // Category management state
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryId, setNewCategoryId] = useState('');
+
+  const activeCategories: StoreCategoryDef[] =
+    settings.categories && settings.categories.length ? settings.categories : FALLBACK_CATEGORIES;
+
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = slugifyCategory(newCategoryId || newCategoryName);
+    const label = newCategoryName.trim();
+    if (!id || !label) return;
+    if (activeCategories.some((c) => c.id === id)) return;
+    onSaveSettings({ ...settings, categories: [...activeCategories, { id, label }] });
+    setNewCategoryName('');
+    setNewCategoryId('');
+  };
+
+  const handleRenameCategory = (id: string, label: string) => {
+    onSaveSettings({
+      ...settings,
+      categories: activeCategories.map((c) => (c.id === id ? { ...c, label } : c)),
+    });
+  };
+
+  const handleRemoveCategory = (id: string) => {
+    const usedBy = products.filter((p) => p.category === id);
+    if (usedBy.length > 0) {
+      showFeedback(`Categoria em uso por ${usedBy.length} item(ns). Reclassifique antes de remover.`);
+      return;
+    }
+    onSaveSettings({
+      ...settings,
+      categories: activeCategories.filter((c) => c.id !== id),
+    });
+  };
 
   // Status update message feedback
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -198,6 +237,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <span>Estoque ({products.length})</span>
           </button>
           <button
+            onClick={() => setActiveTab('categories')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'categories' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Categorias</span>
+          </button>
+          <button
             onClick={() => setActiveTab('orders')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'orders' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
@@ -234,6 +282,95 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* TAB 0: CATEGORY MANAGEMENT */}
+      {activeTab === 'categories' && (
+        <div className="space-y-4">
+          {/* Add Category */}
+          <form
+            onSubmit={handleAddCategory}
+            className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3"
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-indigo-600" />
+              <h3 className="text-sm font-bold text-slate-900">Categorias do Catálogo</h3>
+              <span className="text-[10px] text-slate-500 ml-auto">
+                {activeCategories.length} categoria(s) · exibidas na loja e no filtro
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nome da categoria (ex: Cartas TCG)"
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500 text-xs"
+              />
+              <input
+                type="text"
+                value={newCategoryId}
+                onChange={(e) => setNewCategoryId(e.target.value)}
+                placeholder="Slug (ex: cartas-tcg) — opcional"
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500 text-xs font-mono-nums"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              Dica: deixe o slug em branco para gerar automaticamente a partir do nome.
+            </p>
+          </form>
+
+          {/* Category List */}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200">
+            {activeCategories.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-6">
+                Nenhuma categoria cadastrada. Adicione a primeira acima.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {activeCategories.map((cat) => {
+                  const usedCount = products.filter((p) => p.category === cat.id).length;
+                  return (
+                    <li key={cat.id} className="py-2.5 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 text-[11px] font-bold shrink-0">
+                        {cat.label.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <input
+                          type="text"
+                          defaultValue={cat.label}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v && v !== cat.label) handleRenameCategory(cat.id, v);
+                          }}
+                          className="w-full max-w-xs h-8 px-2 rounded-lg border border-transparent hover:border-slate-200 focus:border-amber-500 focus:outline-none text-xs font-medium"
+                        />
+                        <div className="text-[10px] text-slate-400 font-mono-nums mt-0.5">
+                          {cat.id} · {usedCount} produto(s)
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveCategory(cat.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                        title="Remover categoria"
+                        aria-label={`Remover categoria ${cat.label}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: INVENTORY & STOCK */}
       {activeTab === 'inventory' && (
@@ -655,12 +792,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as ItemCategory })}
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500 bg-white cursor-pointer"
                   >
-                    <option value="tcg">Cartas TCG</option>
-                    <option value="figures">Estátuas & Figures</option>
-                    <option value="coins">Moedas Históricas</option>
-                    <option value="retro">Retrogames</option>
-                    <option value="comics">Quadrinhos Clássicos</option>
-                    <option value="vinyl">Vinis Históricos</option>
+                    {(settings.categories && settings.categories.length ? settings.categories : FALLBACK_CATEGORIES).map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -859,12 +993,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value as ItemCategory })}
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500 bg-white cursor-pointer"
                   >
-                    <option value="tcg">Cartas TCG</option>
-                    <option value="figures">Estátuas & Figures</option>
-                    <option value="coins">Moedas Históricas</option>
-                    <option value="retro">Retrogames</option>
-                    <option value="comics">Quadrinhos Clássicos</option>
-                    <option value="vinyl">Vinis Históricos</option>
+                    {(settings.categories && settings.categories.length ? settings.categories : FALLBACK_CATEGORIES).map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
                   </select>
                 </div>
 

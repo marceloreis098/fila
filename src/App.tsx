@@ -82,8 +82,33 @@ const sanitizeCollectibleItem = (item: CollectibleItem): CollectibleItem => {
 };
 
 export default function App() {
-  // Navigation View
-  const [currentView, setCurrentView] = useState<'store' | 'admin' | 'tracking'>('store');
+  // Navigation View — inicializa e sincroniza com o hash da URL.
+  // O painel administrativo é Oculto: não há botão/link público; o acesso
+  // acontece apenas digitando o caminho correto na barra de endereço
+  // (ex.: https://site.exemplo/#/admin). Rastreio: https://site.exemplo/#/rastreio
+  const getViewFromHash = (): 'store' | 'admin' | 'tracking' => {
+    if (typeof window === 'undefined') return 'store';
+    const h = window.location.hash;
+    if (h.startsWith('#/admin')) return 'admin';
+    if (h.startsWith('#/rastreio')) return 'tracking';
+    return 'store';
+  };
+
+  const [currentView, setCurrentView] = useState<'store' | 'admin' | 'tracking'>(getViewFromHash);
+
+  useEffect(() => {
+    const onHashChange = () => setCurrentView(getViewFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const handleNavigate = (view: 'store' | 'admin' | 'tracking') => {
+    setCurrentView(view);
+    if (typeof window === 'undefined') return;
+    if (view === 'admin') window.location.hash = '#/admin';
+    else if (view === 'tracking') window.location.hash = '#/rastreio';
+    else window.location.hash = '#/';
+  };
 
   // Products state (persisted)
   const [products, setProducts] = useState<CollectibleItem[]>(() => {
@@ -509,7 +534,7 @@ export default function App() {
       {/* Top Header (Strict Contract) */}
       <Header
         currentView={currentView}
-        onNavigate={(v) => setCurrentView(v)}
+        onNavigate={handleNavigate}
         unreadNotificationsCount={unreadNotifCount}
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
         onSearchFocus={scrollToCatalog}
@@ -546,6 +571,7 @@ export default function App() {
                 filters={filters}
                 onFilterChange={setFilters}
                 totalResults={filteredProducts.length}
+                categories={settings.categories}
               />
 
               {/* Product Grid (3-4 columns desktop, 2 tablet, 1-2 mobile) */}
@@ -714,10 +740,6 @@ export default function App() {
               <p className="text-[11px] text-slate-500 mt-1 max-w-md leading-relaxed">
                 Autenticidade garantida com certificado exclusivo, envio blindado com seguro total Sedex para todo o território nacional.
               </p>
-              <div className="text-[10px] text-slate-400 mt-2 space-y-0.5">
-                <div>CNPJ: <span className="font-mono-nums">{settings.contacts.cnpj}</span> · {settings.contacts.companyName}</div>
-                <div>{settings.contacts.address}</div>
-              </div>
             </div>
 
             {/* Direct Contact & Support Box */}
@@ -773,7 +795,7 @@ export default function App() {
       {/* Mobile Touch Ergonomic Bottom Navigation Bar */}
       <BottomTabBar
         currentView={currentView}
-        onNavigate={(v) => setCurrentView(v)}
+        onNavigate={handleNavigate}
         ordersCount={orders.length}
         onSearchFocus={scrollToCatalog}
       />

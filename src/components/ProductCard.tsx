@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CollectibleItem, StoreSiteSettings } from '../types';
 import { formatCurrencyBRL } from '../utils/payment';
 import { productWhatsAppMessage, whatsAppLink } from '../utils/wa';
+import { getCategoryLabel } from '../utils/catalog';
 import { ShieldCheck, Eye, Sparkles, MessageCircle } from 'lucide-react';
 
 interface ProductCardProps {
@@ -17,15 +18,6 @@ const RARITY_LABELS: Record<string, { label: string; textClass: string }> = {
   lendario: { label: 'Lendário', textClass: 'text-amber-700' },
   mitico: { label: 'Mítico', textClass: 'text-rose-700' },
   graal: { label: 'Santo Graal', textClass: 'text-amber-600 font-bold' },
-};
-
-const CATEGORY_NAMES: Record<string, string> = {
-  tcg: 'Cartas TCG',
-  figures: 'Estátuas & Figures',
-  coins: 'Moedas Históricas',
-  retro: 'Retrogames',
-  comics: 'Quadrinhos Clássicos',
-  vinyl: 'Vinis Históricos',
 };
 
 export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect, settings }) => {
@@ -97,7 +89,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item, onSelect, settin
           {/* Metadata line with natural typographic separator */}
           <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5 flex-wrap">
             <span className="uppercase tracking-wider text-[10px] font-semibold text-slate-400">
-              {CATEGORY_NAMES[item.category] || item.category}
+              {getCategoryLabel(settings.categories, item.category)}
             </span>
             <span aria-hidden="true" className="text-slate-300">·</span>
             <span className={`text-[11px] font-medium ${rarityInfo.textClass}`}>
